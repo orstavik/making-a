@@ -1,4 +1,54 @@
+<style>
+  table {
+    border-collapse: collapse;
+    margin: 10px 0;
+    border: 2px solid darkgreen;
+  }
+
+  th,  td {
+    border: 1px solid darkgreen;
+    padding: 5px;
+  }
+  td{ 
+    width: 8ch;
+    height: 8ch;
+    text-align: center;
+  }
+
+  div {
+    margin: 5px 0;
+    border-block: 1px solid lightblue;
+  }
+</style>
+
 <script type="module">
+  function getDocumentLog() {
+    return document.querySelector(".document-log") ?? document.body;
+  }
+
+  function log(...args) {
+    const body = args.map(a => typeof a === "object" ? JSON.stringify(a) : a)
+      .map(a => `<span>${a}</span>`).join("");
+    getDocumentLog().insertAdjacentHTML("beforeend", `<div>${body}</div>`);
+  }
+
+  function table(rows) {
+    const table = document.createElement("table");
+    for (const row of rows) {
+      const tr = document.createElement("tr");
+      for (const a of row) {
+        const td = document.createElement("td");
+        td.textContent = typeof a === "object" ? JSON.stringify(a) : a;
+        tr.appendChild(td);
+      }
+      table.appendChild(tr);
+    }
+    getDocumentLog().appendChild(table);
+  }
+
+  console.log = log;
+  console.table = table;
+
   import { diff, levenshteinLengthWeight } from "./difference.js";
 
   function printTable(str1, str2) {
