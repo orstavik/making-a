@@ -1,4 +1,4 @@
-function customLevenshtein(A, B) {
+export function levenshteinLengthWeight(A, B) {
   const height = A.length;
   const width = B.length;
   const table = Array.from({ length: height + 1 }, _ => Array(width + 1).fill(0));
@@ -11,7 +11,7 @@ function customLevenshtein(A, B) {
 }
 
 export function diff(A, B) {
-  const table = customLevenshtein(A, B);
+  const table = levenshteinLengthWeight(A, B);
   const res = [];
   let now, i = table.length - 1, j = table[0].length - 1;
   while (i > 0 && j > 0 && (now = table[i][j])) {

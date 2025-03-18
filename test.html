@@ -1,8 +1,8 @@
 <script type="module">
-  import { diff } from "./difference.js";
+  import { diff, levenshteinLengthWeight } from "./difference.js";
 
   function printTable(str1, str2) {
-    const resultTable = customLevenshtein(str1, str2);
+    const resultTable = levenshteinLengthWeight(str1, str2);
     const formatCell = num => `${num >> 22}|${(num >> 8) & 0x3FFF}|${num & 0xFF}`;
     const printTable = [
       ["%", ...str2.split("")],
