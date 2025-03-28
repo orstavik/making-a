@@ -10,6 +10,55 @@ export function levenshteinLengthWeight(A, B) {
   return table;
 }
 
+export function diffAsArray(A, B) {
+  const table = levenshteinLengthWeight(A, B);
+  const res = [];
+  let now, i = table.length - 1, j = table[0].length - 1;
+  while (i > 0 && j > 0 && (now = table[i][j])) {
+    const equals = now & 0xFF;
+    if (equals) {
+      i -= equals;
+      j -= equals;
+      const a = A.slice(i, i + equals);
+      res.unshift({ a, b: a });
+    } else {
+      const topLeft = table[i - 1][j - 1], top = table[i - 1][j], left = table[i][j - 1];
+      if (res[0]?.a == res[0]?.b) res.unshift({ a: [], b: [] });
+      if ((topLeft >= top && topLeft >= left) || top >= left)
+        res[0].a.unshift(A[--i]);
+      if ((topLeft >= top && topLeft >= left) || left > top)
+        res[0].b.unshift(B[--j]);
+    }
+  }
+  if (i || j)
+    res.unshift({ a: A.slice(0, i), b: B.slice(0, j) });
+  return res;
+}
+
+export function diffAsStr(A, B) {
+  const table = levenshteinLengthWeight(A, B);
+  const res = [];
+  let now, i = table.length - 1, j = table[0].length - 1;
+  while (i > 0 && j > 0 && (now = table[i][j])) {
+    const equals = now & 0xFF;
+    if (equals) {
+      i -= equals;
+      j -= equals;
+      const str = A.slice(i, i + equals).join("");
+      res.unshift({ a: str, b: str });
+    } else {
+      const topLeft = table[i - 1][j - 1], top = table[i - 1][j], left = table[i][j - 1];
+      const a = (topLeft >= top && topLeft >= left) || top >= left ? A[--i] : "";
+      const b = (topLeft >= top && topLeft >= left) || left > top ? B[--j] : "";
+      res[0]?.a == res[0]?.b ? res.unshift({ a, b }) :
+        (res[0].a = a + res[0].a, res[0].b = b + res[0].b);
+    }
+  }
+  if (i || j)
+    res.unshift({ a: A.slice(0, i).join(""), b: B.slice(0, j).join("") });
+  return res;
+}
+
 export function diff(A, B) {
   const table = levenshteinLengthWeight(A, B);
   const res = [];
