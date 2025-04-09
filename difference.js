@@ -23,7 +23,7 @@ export function diffAsArray(A, B) {
       res.unshift({ a });
     } else {
       const topLeft = table[i - 1][j - 1], top = table[i - 1][j], left = table[i][j - 1];
-      if (res[0]?.a == res[0]?.b) res.unshift({ a: [], b: [] });
+      if (!res[0]?.b) res.unshift({ a: [], b: [] });
       if ((topLeft >= top && topLeft >= left) || top >= left)
         res[0].a.unshift(A[--i]);
       if ((topLeft >= top && topLeft >= left) || left > top)
