@@ -20,7 +20,7 @@ export function diffAsArray(A, B) {
       i -= equals;
       j -= equals;
       const a = A.slice(i, i + equals);
-      res.unshift({ a, b: a });
+      res.unshift({ a });
     } else {
       const topLeft = table[i - 1][j - 1], top = table[i - 1][j], left = table[i][j - 1];
       if (res[0]?.a == res[0]?.b) res.unshift({ a: [], b: [] });
