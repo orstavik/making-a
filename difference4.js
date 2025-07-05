@@ -1,0 +1,271 @@
+function needlemanWunsch(seq1, seq2, match = 0, mismatch = 1, gap = 1) {
+  const m = seq1.length;
+  const n = seq2.length;
+
+  // Initialize the matrix
+  const matrix = Array.from({ length: m + 1 }, () => Array(n + 1).fill(0));
+
+  // Fill first row and first column with gap penalties
+  for (let i = 0; i <= m; i++) {
+    matrix[i][0] = i * gap;
+  }
+  for (let j = 0; j <= n; j++) {
+    matrix[0][j] = j * gap;
+  }
+
+  // Fill the rest of the matrix
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      const cost = seq1[i - 1] === seq2[j - 1] ? match : mismatch;
+      const diag = matrix[i - 1][j - 1] + cost;
+      const up = matrix[i - 1][j] + gap;
+      const left = matrix[i][j - 1] + gap;
+      matrix[i][j] = Math.min(diag, up, left);
+    }
+  }
+
+  return {
+    editDistance: matrix[m][n],
+    matrix,
+  };
+}
+/*
+EDIT is 0x10000
+STREAKEND is 0x1
+SUB is 2*EDIT
+Min(
+  up+EDIT,
+  left+EDIT,
+  UpLeft
++match*SUB
++match*streakend*STREAKEND
+)
+
+function cb(u, l, ul, matches, streakend) {
+  const EDIT = 1 << 16;
+  const STREAKEND = 1;
+  const SUB = 2 * EDIT;
+  return
+  return res;
+}
+*/
+// Example usage:
+// const result = needlemanWunsch("kitten", "sitting");
+// console.log("Edit Distance:", result.editDistance);
+// console.table(result.matrix);
+// console.table(levenshteinLengthWeight("kitten", "sitting", cb));
+
+function convertTable({ table, W, H }) {
+  const result = Array(H - 1);
+  for (let i = 0; i < H; i++)
+    for (let j = 0; j < W; j++)
+      (result[i] ??= [])[j] = table[i * W + j];
+  return result;
+
+}
+
+const EDIT = 1 << 16;
+const STREAKEND = 1;
+const SUB = 2 * EDIT;
+
+const GRID_STYLE = `
+<style>
+  div.mono {
+    display: grid;
+    grid-auto-rows: 1fr;
+    grid-auto-columns: auto;
+    grid-auto-flow: row;
+    font-family: monospace;
+    text-align: center;
+  }
+
+  div.mono > div {
+    border: 1px solid skyblue;
+    padding: 0.2em;
+    margin: 0;
+    aspect-ratio: 1 / 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+  }
+  div.mono > div.highlight {
+    border-color: red;
+  }
+  div.mono > div > * {
+    position: absolute;
+    top: 0;
+    left: 100%;
+    display: none;
+  }
+  div.mono > div:hover > * {
+    display: block;
+  }
+</style>`;
+document.head.insertAdjacentHTML("beforeend", GRID_STYLE);
+
+function upLefts(table, h, w) {
+  const now = table[h][w];
+  const up = h > 1 ? table[h - 1][w] : null;
+  const left = w > 1 ? table[h][w - 1] : null;
+  const upLeft = h > 1 && w > 1 ? table[h - 1][w - 1] : null;
+  return { now, up, left, upLeft };
+}
+
+function priIndel(up, left, upLeft, now) {
+  if (up && !left)
+    return { h: -1 };
+  if (left && !up)
+    return { w: -1 };
+  if (!up && !left)
+    return { w: -1, h: -1 };
+  if (upLeft.textContent == now.textContent)
+    return { w: -1, h: -1 };
+  up = Number(up.textContent);
+  left = Number(left.textContent);
+  upLeft = Number(upLeft.textContent) - 1;
+  if (up <= left && up <= upLeft)
+    return { h: -1 };
+  if (left <= up && left <= upLeft)
+    return { w: -1 };
+  return { w: -1, h: -1 };
+}
+
+function printGrid(rows) {
+  const width = rows[0].length;
+  const height = rows.length;
+  const grid = `<div class="mono" style="grid-template-columns: repeat(${width}, max-content);">
+      ${rows.flat().map(td => `<div>${td}</div>`).join("")}
+    </div>`;
+  document.body.insertAdjacentHTML("beforeend", grid);
+
+  //convert the children into a 2d table of arrays
+  const table = Array.from({ length: height }, () => Array(width).fill(0));
+  for (let i = 0; i < height; i++)
+    for (let j = 0; j < width; j++)
+      table[i][j] = document.body.lastElementChild.children[i * width + j];
+
+  for (let w = width - 1, h = height - 1; w >= 1 && h >= 1;) {
+    const { now, up, left, upLeft } = upLefts(table, h, w);
+    now.classList.add("highlight");
+    const { w: wIndel = 0, h: hIndel = 0 } = priIndel(up, left, upLeft, now);
+    h += hIndel;
+    w += wIndel;
+    // debugger
+    if (!hIndel)
+      now.insertAdjacentHTML("beforeend", `<span>deleted: ${table[0][w + 1].textContent}</span>`);
+    else if (!wIndel)
+      now.insertAdjacentHTML("beforeend", `<span>added: ${table[h + 1][0].textContent}</span>`);
+    else
+      now.insertAdjacentHTML("beforeend", `<span>cross: ${table[h + 1][0].textContent + table[0][w + 1].textContent}</span>`);
+  }
+}
+
+
+function test(A, B) {
+  const table = levenshteinLengthWeight(A, B);
+  const table2 = convertTable(table);
+  let res = table2.map(r => r.map(n => `${n >> 16}.${n & 0xFFFF}`));
+  res.unshift((" " + B).split(""));
+  res.map((r, i) => r.unshift(i < 2 ? "" : A[i - 2]))
+  printGrid(res);
+}
+test("ab", "ab_a_bxx");
+test("ab", "a_b_abxx");
+test("ab_a_bx", "ab");
+test("a_b_abx", "ab");
+test("xxa_b_abx", "ab");
+
+export function levenshteinLengthWeight(A, B) {
+
+  const H = A.length, W = B.length, H2 = H + 1, W2 = W + 1;
+  const table = new Uint32Array(H2 * W2);
+  table[0] = 0;
+  for (let i = 1; i <= W2; i++) table[i] = i * EDIT + (i - 1) * STREAKEND;
+  for (let i = 1; i <= H2; i++) table[i * W2] = i * EDIT + (i - 1) * STREAKEND;
+
+  for (let y1 = 0, y2 = 1; y1 < H; y1++, y2++)
+    for (let x1 = 0, x2 = 1; x1 < W; x1++, x2++)
+      table[y2 * W2 + x2] = Math.min(
+        table[y1 * W2 + x2] + EDIT + STREAKEND,
+        table[y2 * W2 + x1] + EDIT + STREAKEND,
+        table[y1 * W2 + x1] + (A[y1] != B[x1] ? EDIT + STREAKEND : A[y2] != B[x2] || y2 == H ? STREAKEND : 0)
+      );
+  return { table, H: H2, W: W2 };
+}
+
+export function diffAsArray(A, B) {
+  const table = levenshteinLengthWeight(A, B);
+  const res = [];
+  let now, i = table.length - 1, j = table[0].length - 1;
+  while (i > 0 && j > 0 && (now = table[i][j])) {
+    const equals = now & 0xFF;
+    if (equals) {
+      i -= equals;
+      j -= equals;
+      const a = A.slice(i, i + equals);
+      res.unshift({ a });
+    } else {
+      const topLeft = table[i - 1][j - 1], top = table[i - 1][j], left = table[i][j - 1];
+      if (!res[0]?.b) res.unshift({ a: [], b: [] });
+      if ((topLeft >= top && topLeft >= left) || top >= left)
+        res[0].a.unshift(A[--i]);
+      if ((topLeft >= top && topLeft >= left) || left > top)
+        res[0].b.unshift(B[--j]);
+    }
+  }
+  if (i || j)
+    res.unshift({ a: A.slice(0, i), b: B.slice(0, j) });
+  return res;
+}
+
+export function diffAsStr(A, B) {
+  const table = levenshteinLengthWeight(A, B);
+  const res = [];
+  let now, i = table.length - 1, j = table[0].length - 1;
+  while (i >= 0 && j >= 0 && (now = table[i][j])) {
+    const equals = now & 0xFF;
+    if (equals) {
+      i -= equals;
+      j -= equals;
+      const str = A.slice(i, i + equals).join("");
+      res.unshift({ a: str, b: str });
+    } else {
+      const topLeft = table[i - 1][j - 1], top = table[i - 1][j], left = table[i][j - 1];
+      const a = (topLeft >= top && topLeft >= left) || top >= left ? A[--i] : "";
+      const b = (topLeft >= top && topLeft >= left) || left > top ? B[--j] : "";
+      res[0]?.a == res[0]?.b ? res.unshift({ a, b }) :
+        (res[0].a = a + res[0].a, res[0].b = b + res[0].b);
+    }
+  }
+  if (i || j)
+    res.unshift({ a: A.slice(0, i).join(""), b: B.slice(0, j).join("") });
+  return res;
+}
+
+export function diff(A, B) {
+  const table = levenshteinLengthWeight(A, B);
+  const height = A.length;
+  const width = B.length;
+
+  const res = [];
+  let now, i = height - 1, j = width.length - 1;
+  while (i > 0 && j > 0 && (now = table[i][j])) {
+    const equals = A[i] === B[j];
+    if (equals) {
+      i -= 1;
+      j -= 1;
+      const str = A.slice(i, i + 1);
+      res.unshift({ a: str, b: str });
+    } else {
+      const topLeft = table[i - 1][j - 1], top = table[i - 1][j], left = table[i][j - 1];
+      const a = (topLeft >= top && topLeft >= left) || top >= left ? A[--i] : "";
+      const b = (topLeft >= top && topLeft >= left) || left > top ? B[--j] : "";
+      res[0]?.a == res[0]?.b ? res.unshift({ a, b }) :
+        (res[0].a = a + res[0].a, res[0].b = b + res[0].b);
+    }
+  }
+  if (i || j)
+    res.unshift({ a: A.slice(0, i), b: B.slice(0, j) });
+  return res;
+}
