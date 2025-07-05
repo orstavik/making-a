@@ -4,7 +4,6 @@ function convertTable({ table, W, H }) {
     for (let j = 0; j < W; j++)
       (result[i] ??= [])[j] = table[i * W + j];
   return result;
-
 }
 
 const EDIT = 1 << 16;
@@ -33,6 +32,9 @@ const GRID_STYLE = `
   }
   div.mono > div.highlight {
     border-color: red;
+  }
+  div.mono > div.matches {
+    background-color: lightgreen;
   }
   div.mono > div > * {
     position: absolute;
@@ -73,7 +75,7 @@ function priIndel(up, left, upLeft, now) {
   return "cross";
 }
 
-function printGrid(rows) {
+function printGrid(rows, A, B) {
   const width = rows[0].length;
   const height = rows.length;
   const grid = `<div class="mono" style="grid-template-columns: repeat(${width}, max-content);">
@@ -90,29 +92,37 @@ function printGrid(rows) {
   const actions = [];
   for (let w = width - 1, h = height - 1; w >= 1 && h >= 1;) {
     const { now, up, left, upLeft } = upLefts(table, h, w);
+    const a = A[h - 2];
+    const b = B[w - 2];
     now.classList.add("highlight");
     const type = priIndel(up, left, upLeft, now);
+    if (a == b && type == "cross") now.classList.add("matches");
     if (type == "end") break;
-    if (type != "add") h -= 1;
-    if (type != "del") w -= 1;
-    if (type == "add")
-      now.insertAdjacentHTML("beforeend", `<span>${type}: ${table[0][w + 1].textContent}</span>`);
-    else if (type == "del")
-      now.insertAdjacentHTML("beforeend", `<span>${type}: ${table[h + 1][0].textContent}</span>`);
-    else
-      now.insertAdjacentHTML("beforeend", `<span>${type}: ${table[h + 1][0].textContent + table[0][w + 1].textContent}</span>`);
+    if (type == "add") {
+      w -= 1;
+      now.insertAdjacentHTML("beforeend", `<span>${type}: ${b}</span>`);
+    } else if (type == "del") {
+      h -= 1;
+      now.insertAdjacentHTML("beforeend", `<span>${type}: ${a}</span>`);
+    } else {
+      h -= 1;
+      w -= 1;
+      now.insertAdjacentHTML("beforeend", `<span>${type}: ${b + a}</span>`);
+    }
   }
 }
 
 
 function test(A, B) {
   const table = levenshteinLengthWeight(A, B);
-  const table2 = convertTable(table);
-  let res = table2.map(r => r.map(n => `${n >> 16}.${n & 0xFFFF}`));
+  table.table = Array.from(table.table).map(n => `${n >> 16}.${n & 0xFFFF}`);
+  let res = convertTable(table);
   res.unshift((" " + B).split(""));
   res.map((r, i) => r.unshift(i < 2 ? "" : A[i - 2]))
-  printGrid(res);
+  printGrid(res, A, B);
 }
+
+test("aby", "abx");
 test("ab", "ab_a_bxx");
 test("ab", "a_b_abxx");
 test("ab_a_bx", "ab");
