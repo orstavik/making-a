@@ -1,60 +1,3 @@
-function needlemanWunsch(seq1, seq2, match = 0, mismatch = 1, gap = 1) {
-  const m = seq1.length;
-  const n = seq2.length;
-
-  // Initialize the matrix
-  const matrix = Array.from({ length: m + 1 }, () => Array(n + 1).fill(0));
-
-  // Fill first row and first column with gap penalties
-  for (let i = 0; i <= m; i++) {
-    matrix[i][0] = i * gap;
-  }
-  for (let j = 0; j <= n; j++) {
-    matrix[0][j] = j * gap;
-  }
-
-  // Fill the rest of the matrix
-  for (let i = 1; i <= m; i++) {
-    for (let j = 1; j <= n; j++) {
-      const cost = seq1[i - 1] === seq2[j - 1] ? match : mismatch;
-      const diag = matrix[i - 1][j - 1] + cost;
-      const up = matrix[i - 1][j] + gap;
-      const left = matrix[i][j - 1] + gap;
-      matrix[i][j] = Math.min(diag, up, left);
-    }
-  }
-
-  return {
-    editDistance: matrix[m][n],
-    matrix,
-  };
-}
-/*
-EDIT is 0x10000
-STREAKEND is 0x1
-SUB is 2*EDIT
-Min(
-  up+EDIT,
-  left+EDIT,
-  UpLeft
-+match*SUB
-+match*streakend*STREAKEND
-)
-
-function cb(u, l, ul, matches, streakend) {
-  const EDIT = 1 << 16;
-  const STREAKEND = 1;
-  const SUB = 2 * EDIT;
-  return
-  return res;
-}
-*/
-// Example usage:
-// const result = needlemanWunsch("kitten", "sitting");
-// console.log("Edit Distance:", result.editDistance);
-// console.table(result.matrix);
-// console.table(levenshteinLengthWeight("kitten", "sitting", cb));
-
 function convertTable({ table, W, H }) {
   const result = Array(H - 1);
   for (let i = 0; i < H; i++)
@@ -66,7 +9,6 @@ function convertTable({ table, W, H }) {
 
 const EDIT = 1 << 16;
 const STREAKEND = 1;
-const SUB = 2 * EDIT;
 
 const GRID_STYLE = `
 <style>
@@ -114,21 +56,21 @@ function upLefts(table, h, w) {
 
 function priIndel(up, left, upLeft, now) {
   if (up && !left)
-    return { h: -1 };
+    return "del";
   if (left && !up)
-    return { w: -1 };
+    return "add";
   if (!up && !left)
-    return { w: -1, h: -1 };
+    return "end"
   if (upLeft.textContent == now.textContent)
-    return { w: -1, h: -1 };
+    return "cross";
   up = Number(up.textContent);
   left = Number(left.textContent);
   upLeft = Number(upLeft.textContent) - 1;
   if (up <= left && up <= upLeft)
-    return { h: -1 };
+    return "del";
   if (left <= up && left <= upLeft)
-    return { w: -1 };
-  return { w: -1, h: -1 };
+    return "add";
+  return "cross";
 }
 
 function printGrid(rows) {
@@ -145,19 +87,20 @@ function printGrid(rows) {
     for (let j = 0; j < width; j++)
       table[i][j] = document.body.lastElementChild.children[i * width + j];
 
+  const actions = [];
   for (let w = width - 1, h = height - 1; w >= 1 && h >= 1;) {
     const { now, up, left, upLeft } = upLefts(table, h, w);
     now.classList.add("highlight");
-    const { w: wIndel = 0, h: hIndel = 0 } = priIndel(up, left, upLeft, now);
-    h += hIndel;
-    w += wIndel;
-    // debugger
-    if (!hIndel)
-      now.insertAdjacentHTML("beforeend", `<span>deleted: ${table[0][w + 1].textContent}</span>`);
-    else if (!wIndel)
-      now.insertAdjacentHTML("beforeend", `<span>added: ${table[h + 1][0].textContent}</span>`);
+    const type = priIndel(up, left, upLeft, now);
+    if (type == "end") break;
+    if (type != "add") h -= 1;
+    if (type != "del") w -= 1;
+    if (type == "add")
+      now.insertAdjacentHTML("beforeend", `<span>${type}: ${table[0][w + 1].textContent}</span>`);
+    else if (type == "del")
+      now.insertAdjacentHTML("beforeend", `<span>${type}: ${table[h + 1][0].textContent}</span>`);
     else
-      now.insertAdjacentHTML("beforeend", `<span>cross: ${table[h + 1][0].textContent + table[0][w + 1].textContent}</span>`);
+      now.insertAdjacentHTML("beforeend", `<span>${type}: ${table[h + 1][0].textContent + table[0][w + 1].textContent}</span>`);
   }
 }
 
