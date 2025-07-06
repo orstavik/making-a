@@ -50,31 +50,6 @@ const GRID_STYLE = `
 </style>`;
 document.head.insertAdjacentHTML("beforeend", GRID_STYLE);
 
-function upLefts2(table, h, w) {
-  let now = table[h][w];
-  if (h <= 1 && w <= 1)
-    return { type: "end", now };
-  if (h <= 1)
-    return { type: "add", now };
-  if (w <= 1)
-    return { type: "del", now };
-
-  let up = table[h - 1][w];
-  let left = table[h][w - 1];
-  let upLeft = table[h - 1][w - 1];
-
-  if (upLeft.textContent == now.textContent)
-    return { type: "cross", now };
-  up = Number(up.textContent);
-  left = Number(left.textContent);
-  upLeft = Number(upLeft.textContent) - 1; //edit distance
-  if (up <= left && up <= upLeft)
-    return { type: "del", now };
-  if (left <= up && left <= upLeft)
-    return { type: "add", now };
-  return { type: "cross", now };
-}
-
 function upLefts(table, h, w) {
   let now = table[h][w];
   if (h <= 1 && w <= 1)
@@ -100,7 +75,47 @@ function upLefts(table, h, w) {
   return { type: "cross", now };
 }
 
+function upLefts2(table, W, h, w) {
+  let now = table[h * W + w];
+  if (!h && !w)
+    return { type: "end", now };
+  if (!h)
+    return { type: "add", now };
+  if (!w)
+    return { type: "del", now };
+
+  let up = table[(h - 1) * W + w];
+  let left = table[h * W + w - 1];
+  let upLeft = table[(h - 1) * W + w - 1];
+
+  if (upLeft == now)
+    return { type: "cross", now };
+  upLeft -= EDIT;
+  if (up <= left && up <= upLeft)
+    return { type: "del", now };
+  if (left <= up && left <= upLeft)
+    return { type: "add", now };
+  return { type: "cross", now };
+}
+
+function backtrace2(rows, A, B) {
+  const H = A.length, W = B.length;
+  const res = [];
+  for (let x = W, y = H; x >= 0 || y >= 0;) {
+    const n = y * W + x;
+    const { type, now } = upLefts2(rows, W + 1, y, x);
+    res.unshift({ type, now, x, y, a: A[y - 1], b: B[x - 1] });
+    if (type != "del") x -= 1;
+    if (type != "add") y -= 1;
+  }
+  return res;
+}
+
 function printGrid(rows, A, B) {
+
+  const backtrace = backtrace2(rows, A, B);
+  debugger
+
   rows = Array.from(rows).map(n => `${n >> 16}.${n & 0xFFFF}`);
   rows = convertTable(rows, B.length + 1, A.length + 1);
   rows.unshift((" " + B).split(""));
@@ -125,7 +140,7 @@ function printGrid(rows, A, B) {
     const b = B[w - 2];
     now.classList.add("highlight");
     if (a == b && type == "cross") now.classList.add("matches");
-    if (type == "end") break;
+    // if (type == "end") break;
     if (type == "add") {
       w -= 1;
       now.insertAdjacentHTML("beforeend", `<span>${type}: ${b}</span>`);
