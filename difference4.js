@@ -118,6 +118,16 @@ function printGrid(rows, A, B) {
   }
 }
 
+function injectDivs(el, nth, txts) {
+  for (let i = nth; el && txts.length; i++, el = el.nextElementSibling) {
+    if (!(i % nth)) {
+      const div = document.createElement("div");
+      div.textContent = txts.shift();
+      el.before(div);
+    }
+  }
+}
+
 
 function test(A, B) {
   printGrid(levenshteinLengthWeight(A, B), A, B);
@@ -131,10 +141,9 @@ test("a_b_abx", "ab");
 test("xxa_b_abx", "ab");
 
 export function levenshteinLengthWeight(A, B) {
-
   const H = A.length, W = B.length, H2 = H + 1, W2 = W + 1;
+
   const table = new Uint32Array(H2 * W2);
-  table[0] = 0;
   for (let i = 1; i <= W2; i++) table[i] = i * EDIT + (i - 1) * STREAKEND;
   for (let i = 1; i <= H2; i++) table[i * W2] = i * EDIT + (i - 1) * STREAKEND;
 
