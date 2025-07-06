@@ -55,7 +55,8 @@ function upLefts(table, h, w) {
   const up = h > 1 ? table[h - 1][w] : null;
   const left = w > 1 ? table[h][w - 1] : null;
   const upLeft = h > 1 && w > 1 ? table[h - 1][w - 1] : null;
-  return { now, up, left, upLeft };
+  const type = priIndel(up, left, upLeft, now);
+  return { now, up, left, upLeft, type };
 }
 
 function priIndel(up, left, upLeft, now) {
@@ -97,11 +98,10 @@ function printGrid(rows, A, B) {
 
   const actions = [];
   for (let w = width - 1, h = height - 1; w >= 1 && h >= 1;) {
-    const { now, up, left, upLeft } = upLefts(table, h, w);
+    const { now, up, left, upLeft, type } = upLefts(table, h, w);
     const a = A[h - 2];
     const b = B[w - 2];
     now.classList.add("highlight");
-    const type = priIndel(up, left, upLeft, now);
     if (a == b && type == "cross") now.classList.add("matches");
     if (type == "end") break;
     if (type == "add") {
