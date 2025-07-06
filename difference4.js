@@ -75,21 +75,21 @@ function upLefts(table, h, w) {
   return { type: "cross", now };
 }
 
-function upLefts2(table, W, h, w) {
-  let now = table[h * W + w];
-  if (!h && !w)
+function upLefts2(table, W, n) {//h, w) {
+  let now = table[n];
+  if (!n)
     return { type: "end", now };
-  if (!h)
+  if (n < W)
     return { type: "add", now };
-  if (!w)
+  if (!(n % W))
     return { type: "del", now };
 
-  let up = table[(h - 1) * W + w];
-  let left = table[h * W + w - 1];
-  let upLeft = table[(h - 1) * W + w - 1];
-
+  let upLeft = table[n - W - 1];
   if (upLeft == now)
     return { type: "cross", now };
+
+  let up = table[n - W];
+  let left = table[n - 1];
   upLeft -= EDIT;
   if (up <= left && up <= upLeft)
     return { type: "del", now };
@@ -99,14 +99,15 @@ function upLefts2(table, W, h, w) {
 }
 
 function backtrace2(rows, A, B) {
-  const H = A.length, W = B.length;
+  const W = B.length + 1;
   const res = [];
-  for (let x = W, y = H; x >= 0 || y >= 0;) {
-    const n = y * W + x;
-    const { type, now } = upLefts2(rows, W + 1, y, x);
-    res.unshift({ type, now, x, y, a: A[y - 1], b: B[x - 1] });
-    if (type != "del") x -= 1;
-    if (type != "add") y -= 1;
+  for (let n = rows.length - 1; n >= 0;) {
+    const { type, now } = upLefts2(rows, W, n);// y, x);
+    const y = Math.floor(n / W);
+    const x = n % W;
+    res.unshift({ type, now, n, x, y, a: A[y - 1], b: B[x - 1] });
+    if (type != "del") n -= W;
+    if (type != "add") n -= 1;
   }
   return res;
 }
