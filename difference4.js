@@ -51,31 +51,28 @@ const GRID_STYLE = `
 document.head.insertAdjacentHTML("beforeend", GRID_STYLE);
 
 function upLefts(table, h, w) {
-  const now = table[h][w];
-  const up = h > 1 ? table[h - 1][w] : null;
-  const left = w > 1 ? table[h][w - 1] : null;
-  const upLeft = h > 1 && w > 1 ? table[h - 1][w - 1] : null;
-  const type = priIndel(up, left, upLeft, now);
-  return { now, up, left, upLeft, type };
-}
+  let now = table[h][w];
+  if (h <= 1)
+    return { type: "add", now };
+  if (w <= 1)
+    return { type: "del", now };
+  if (h <= 1 && w <= 1)
+    return { type: "end", now };
 
-function priIndel(up, left, upLeft, now) {
-  if (up && !left)
-    return "del";
-  if (left && !up)
-    return "add";
-  if (!up && !left)
-    return "end"
+  let up = table[h - 1][w];
+  let left = table[h][w - 1];
+  let upLeft = table[h - 1][w - 1];
+
   if (upLeft.textContent == now.textContent)
-    return "cross";
+    return { type: "cross", now };
   up = Number(up.textContent);
   left = Number(left.textContent);
-  upLeft = Number(upLeft.textContent) - 1;
+  upLeft = Number(upLeft.textContent) - 1; //edit distance
   if (up <= left && up <= upLeft)
-    return "del";
+    return { type: "del", now };
   if (left <= up && left <= upLeft)
-    return "add";
-  return "cross";
+    return { type: "add", now };
+  return { type: "cross", now };
 }
 
 function printGrid(rows, A, B) {
@@ -98,7 +95,7 @@ function printGrid(rows, A, B) {
 
   const actions = [];
   for (let w = width - 1, h = height - 1; w >= 1 && h >= 1;) {
-    const { now, up, left, upLeft, type } = upLefts(table, h, w);
+    const { now, type } = upLefts(table, h, w);
     const a = A[h - 2];
     const b = B[w - 2];
     now.classList.add("highlight");
