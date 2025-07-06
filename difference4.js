@@ -112,48 +112,96 @@ function backtrace2(rows, A, B) {
   return res;
 }
 
+function* backtrace(table, W) {
+  for (let n = table.length - 1; n >= 0;) {
+    const y = Math.floor(n / W);
+    const x = n % W;
+    const now = table[n];
+    let type;
+    if (n == 0)
+      type = "end";
+    else if (y == 0)
+      type = "add";
+    else if (x == 0)
+      type = "del";
+    else {
+      let upLeft = table[n - W - 1];
+      if (upLeft == now) {
+        type = "cross";
+      } else {
+        const up = table[n - W];
+        const left = table[n - 1];
+        upLeft -= EDIT;
+        if (up <= left && up <= upLeft)
+          type = "del";
+        else if (left <= up && left <= upLeft)
+          type = "add";
+        else
+          type = "cross";
+      }
+    }
+    yield { type, now, n, x, y };
+    if (type != "del") n -= 1;
+    if (type != "add") n -= W;
+  }
+}
+
 function printGrid(rows, A, B) {
 
-  const backtrace = backtrace2(rows, A, B);
-  debugger
+  const bt = [];
+  for (let point of backtrace(rows, B.length + 1)) {
+    point.a = A[point.y - 1];
+    point.b = B[point.x - 1];
+    bt.unshift(point);
+  }
 
-  rows = Array.from(rows).map(n => `${n >> 16}.${n & 0xFFFF}`);
-  rows = convertTable(rows, B.length + 1, A.length + 1);
-  rows.unshift((" " + B).split(""));
-  rows.map((r, i) => r.unshift(i < 2 ? "" : A[i - 2]));
-  const width = rows[0].length;
-  const height = rows.length;
-  const grid = `<div class="mono" style="grid-template-columns: repeat(${width}, max-content);">
-      ${rows.flat().map(td => `<div>${td}</div>`).join("")}
+  // const backtrace = backtrace2(rows, A, B);
+
+  // rows = Array.from(rows).map(n => `${n >> 16}.${n & 0xFFFF}`);
+  // rows = convertTable(rows, B.length + 1, A.length + 1);
+  // rows.unshift((" " + B).split(""));
+  // rows.map((r, i) => r.unshift(i < 2 ? "" : A[i - 2]));
+  // const width = rows[0].length;
+  // const height = rows.length;
+  const grid = `<div class="mono" style="grid-template-columns: repeat(${B.length + 1}, max-content);">
+      ${Array.from(rows).map(n => `<div>${n >> 16}.${n & 0xFFFF}</div>`).join("")}
     </div>`;
   document.body.insertAdjacentHTML("beforeend", grid);
-
-  //convert the children into a 2d table of arrays
-  const table = Array.from({ length: height }, () => Array(width).fill(0));
-  for (let i = 0; i < height; i++)
-    for (let j = 0; j < width; j++)
-      table[i][j] = document.body.lastElementChild.children[i * width + j];
-
-  const actions = [];
-  for (let w = width - 1, h = height - 1; w >= 1 && h >= 1;) {
-    const { now, type } = upLefts(table, h, w);
-    const a = A[h - 2];
-    const b = B[w - 2];
-    now.classList.add("highlight");
-    if (a == b && type == "cross") now.classList.add("matches");
-    // if (type == "end") break;
-    if (type == "add") {
-      w -= 1;
-      now.insertAdjacentHTML("beforeend", `<span>${type}: ${b}</span>`);
-    } else if (type == "del") {
-      h -= 1;
-      now.insertAdjacentHTML("beforeend", `<span>${type}: ${a}</span>`);
-    } else {
-      h -= 1;
-      w -= 1;
-      now.insertAdjacentHTML("beforeend", `<span>${type}: ${b + a}</span>`);
-    }
+  const children = document.body.lastElementChild.children;
+  for (let point of bt) {
+    const el = children[point.n];
+    if (point.type == "cross" && point.a == point.b)
+      el.classList.add("matches");
+    el.classList.add("highlight", point.type);
+    el.insertAdjacentHTML("beforeend", `<span>${point.type}: ${point.a + point.b}</span>`)
   }
+
+  // //convert the children into a 2d table of arrays
+  // const table = Array.from({ length: height }, () => Array(width).fill(0));
+  // for (let i = 0; i < height; i++)
+  //   for (let j = 0; j < width; j++)
+  //     table[i][j] = document.body.lastElementChild.children[i * width + j];
+
+  // const actions = [];
+  // for (let w = width - 1, h = height - 1; w >= 1 && h >= 1;) {
+  //   const { now, type } = upLefts(table, h, w);
+  //   const a = A[h - 2];
+  //   const b = B[w - 2];
+  //   now.classList.add("highlight");
+  //   if (a == b && type == "cross") now.classList.add("matches");
+  //   // if (type == "end") break;
+  //   if (type == "add") {
+  //     w -= 1;
+  //     now.insertAdjacentHTML("beforeend", `<span>${type}: ${b}</span>`);
+  //   } else if (type == "del") {
+  //     h -= 1;
+  //     now.insertAdjacentHTML("beforeend", `<span>${type}: ${a}</span>`);
+  //   } else {
+  //     h -= 1;
+  //     w -= 1;
+  //     now.insertAdjacentHTML("beforeend", `<span>${type}: ${b + a}</span>`);
+  //   }
+  // }
 }
 
 function injectDivs(el, nth, txts) {
