@@ -1,4 +1,4 @@
-function convertTable({ table, W, H }) {
+function convertTable(table, W, H) {
   const result = Array(H - 1);
   for (let i = 0; i < H; i++)
     for (let j = 0; j < W; j++)
@@ -44,6 +44,8 @@ const GRID_STYLE = `
   }
   div.mono > div:hover > * {
     display: block;
+    background-color: white;
+    z-index: 1000;
   }
 </style>`;
 document.head.insertAdjacentHTML("beforeend", GRID_STYLE);
@@ -76,6 +78,10 @@ function priIndel(up, left, upLeft, now) {
 }
 
 function printGrid(rows, A, B) {
+  rows = Array.from(rows).map(n => `${n >> 16}.${n & 0xFFFF}`);
+  rows = convertTable(rows, B.length + 1, A.length + 1);
+  rows.unshift((" " + B).split(""));
+  rows.map((r, i) => r.unshift(i < 2 ? "" : A[i - 2]));
   const width = rows[0].length;
   const height = rows.length;
   const grid = `<div class="mono" style="grid-template-columns: repeat(${width}, max-content);">
@@ -114,12 +120,7 @@ function printGrid(rows, A, B) {
 
 
 function test(A, B) {
-  const table = levenshteinLengthWeight(A, B);
-  table.table = Array.from(table.table).map(n => `${n >> 16}.${n & 0xFFFF}`);
-  let res = convertTable(table);
-  res.unshift((" " + B).split(""));
-  res.map((r, i) => r.unshift(i < 2 ? "" : A[i - 2]))
-  printGrid(res, A, B);
+  printGrid(levenshteinLengthWeight(A, B), A, B);
 }
 
 test("aby", "abx");
@@ -144,7 +145,7 @@ export function levenshteinLengthWeight(A, B) {
         table[y2 * W2 + x1] + EDIT + STREAKEND,
         table[y1 * W2 + x1] + (A[y1] != B[x1] ? EDIT + STREAKEND : A[y2] != B[x2] || y2 == H ? STREAKEND : 0)
       );
-  return { table, H: H2, W: W2 };
+  return table;
 }
 
 export function diffAsArray(A, B) {
