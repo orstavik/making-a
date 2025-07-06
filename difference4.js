@@ -1,11 +1,3 @@
-function convertTable(table, W, H) {
-  const result = Array(H - 1);
-  for (let i = 0; i < H; i++)
-    for (let j = 0; j < W; j++)
-      (result[i] ??= [])[j] = table[i * W + j];
-  return result;
-}
-
 const EDIT = 1 << 16;
 const STREAKEND = 1;
 
@@ -30,12 +22,20 @@ const GRID_STYLE = `
     justify-content: center;
     position: relative;
   }
-  div.mono > div.highlight {
-    border-color: red;
+  div.mono > div:hover::before {
+    content: attr(a) "|" attr(b);
+    position: absolute;
+    top: 0;
+    left: 0;
+    background-color: white;
+    z-index: 1000;
   }
-  div.mono > div.matches {
-    background-color: lightgreen;
-  }
+  div.mono > div.del { background-color: salmon; }
+  div.mono > div.add { background-color: plum; }
+  div.mono > div.cross { background-color: chocolate; }
+  div.mono > div.match { background-color: lime; }
+  div.mono > div.end { background-color: grey; }
+/*
   div.mono > div > * {
     position: absolute;
     top: 0;
@@ -47,70 +47,9 @@ const GRID_STYLE = `
     background-color: white;
     z-index: 1000;
   }
+*/
 </style>`;
 document.head.insertAdjacentHTML("beforeend", GRID_STYLE);
-
-function upLefts(table, h, w) {
-  let now = table[h][w];
-  if (h <= 1 && w <= 1)
-    return { type: "end", now };
-  if (h <= 1)
-    return { type: "add", now };
-  if (w <= 1)
-    return { type: "del", now };
-
-  let up = table[h - 1][w];
-  let left = table[h][w - 1];
-  let upLeft = table[h - 1][w - 1];
-
-  if (upLeft.textContent == now.textContent)
-    return { type: "cross", now };
-  up = Number(up.textContent);
-  left = Number(left.textContent);
-  upLeft = Number(upLeft.textContent) - 1; //edit distance
-  if (up <= left && up <= upLeft)
-    return { type: "del", now };
-  if (left <= up && left <= upLeft)
-    return { type: "add", now };
-  return { type: "cross", now };
-}
-
-function upLefts2(table, W, n) {//h, w) {
-  let now = table[n];
-  if (!n)
-    return { type: "end", now };
-  if (n < W)
-    return { type: "add", now };
-  if (!(n % W))
-    return { type: "del", now };
-
-  let upLeft = table[n - W - 1];
-  if (upLeft == now)
-    return { type: "cross", now };
-
-  let up = table[n - W];
-  let left = table[n - 1];
-  upLeft -= EDIT;
-  if (up <= left && up <= upLeft)
-    return { type: "del", now };
-  if (left <= up && left <= upLeft)
-    return { type: "add", now };
-  return { type: "cross", now };
-}
-
-function backtrace2(rows, A, B) {
-  const W = B.length + 1;
-  const res = [];
-  for (let n = rows.length - 1; n >= 0;) {
-    const { type, now } = upLefts2(rows, W, n);// y, x);
-    const y = Math.floor(n / W);
-    const x = n % W;
-    res.unshift({ type, now, n, x, y, a: A[y - 1], b: B[x - 1] });
-    if (type != "del") n -= W;
-    if (type != "add") n -= 1;
-  }
-  return res;
-}
 
 function* backtrace(table, W) {
   for (let n = table.length - 1; n >= 0;) {
@@ -146,77 +85,38 @@ function* backtrace(table, W) {
   }
 }
 
-function printGrid(rows, A, B) {
-
-  const bt = [];
-  for (let point of backtrace(rows, B.length + 1)) {
-    point.a = A[point.y - 1];
-    point.b = B[point.x - 1];
-    bt.unshift(point);
+function* backtraceMatches(table, A, B) {
+  for (let p of backtrace(table, B.length + 1)) {
+    p.a = A[p.y - 1];
+    p.b = B[p.x - 1];
+    if (p.type == "cross" && p.a == p.b) p.type = "match";
+    yield p;
   }
+}
 
-  // const backtrace = backtrace2(rows, A, B);
+function printGrid(rows, bt, A, B) {
 
-  // rows = Array.from(rows).map(n => `${n >> 16}.${n & 0xFFFF}`);
-  // rows = convertTable(rows, B.length + 1, A.length + 1);
-  // rows.unshift((" " + B).split(""));
-  // rows.map((r, i) => r.unshift(i < 2 ? "" : A[i - 2]));
-  // const width = rows[0].length;
-  // const height = rows.length;
-  const grid = `<div class="mono" style="grid-template-columns: repeat(${B.length + 1}, max-content);">
-      ${Array.from(rows).map(n => `<div>${n >> 16}.${n & 0xFFFF}</div>`).join("")}
+  const grid = `<div class="mono" style="grid-template-columns: repeat(${B.length + 2}, max-content);">
+      ${Array.from(rows).map(n => `<div a="" b="">${n >> 16}.${n & 0xFFFF}</div>`).join("")}
     </div>`;
   document.body.insertAdjacentHTML("beforeend", grid);
   const children = document.body.lastElementChild.children;
-  for (let point of bt) {
-    const el = children[point.n];
-    if (point.type == "cross" && point.a == point.b)
-      el.classList.add("matches");
-    el.classList.add("highlight", point.type);
-    el.insertAdjacentHTML("beforeend", `<span>${point.type}: ${point.a + point.b}</span>`)
+
+  for (let p of bt) {
+    children[p.n].classList.add(p.type);
+    p.a && children[p.n].setAttribute("a", p.a);
+    p.b && children[p.n].setAttribute("b", p.b);
   }
-
-  // //convert the children into a 2d table of arrays
-  // const table = Array.from({ length: height }, () => Array(width).fill(0));
-  // for (let i = 0; i < height; i++)
-  //   for (let j = 0; j < width; j++)
-  //     table[i][j] = document.body.lastElementChild.children[i * width + j];
-
-  // const actions = [];
-  // for (let w = width - 1, h = height - 1; w >= 1 && h >= 1;) {
-  //   const { now, type } = upLefts(table, h, w);
-  //   const a = A[h - 2];
-  //   const b = B[w - 2];
-  //   now.classList.add("highlight");
-  //   if (a == b && type == "cross") now.classList.add("matches");
-  //   // if (type == "end") break;
-  //   if (type == "add") {
-  //     w -= 1;
-  //     now.insertAdjacentHTML("beforeend", `<span>${type}: ${b}</span>`);
-  //   } else if (type == "del") {
-  //     h -= 1;
-  //     now.insertAdjacentHTML("beforeend", `<span>${type}: ${a}</span>`);
-  //   } else {
-  //     h -= 1;
-  //     w -= 1;
-  //     now.insertAdjacentHTML("beforeend", `<span>${type}: ${b + a}</span>`);
-  //   }
-  // }
+  children[0].insertAdjacentHTML("beforebegin", (" " + B).split("").map(c => `<div>${c}</div>`).join(""));
+  A = "  " + A;
+  for (let i = 0; i < A.length; i++)
+    children[i * (B.length + 2)].insertAdjacentHTML("beforebegin", `<div>${A[i]}</div>`);
 }
-
-function injectDivs(el, nth, txts) {
-  for (let i = nth; el && txts.length; i++, el = el.nextElementSibling) {
-    if (!(i % nth)) {
-      const div = document.createElement("div");
-      div.textContent = txts.shift();
-      el.before(div);
-    }
-  }
-}
-
 
 function test(A, B) {
-  printGrid(levenshteinLengthWeight(A, B), A, B);
+  const table = levenshteinLengthWeight(A, B);
+  const bt = [...backtraceMatches(table, A, B)];
+  printGrid(table, bt, A, B);
 }
 
 test("aby", "abx");
