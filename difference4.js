@@ -50,14 +50,39 @@ const GRID_STYLE = `
 </style>`;
 document.head.insertAdjacentHTML("beforeend", GRID_STYLE);
 
-function upLefts(table, h, w) {
+function upLefts2(table, h, w) {
   let now = table[h][w];
+  if (h <= 1 && w <= 1)
+    return { type: "end", now };
   if (h <= 1)
     return { type: "add", now };
   if (w <= 1)
     return { type: "del", now };
+
+  let up = table[h - 1][w];
+  let left = table[h][w - 1];
+  let upLeft = table[h - 1][w - 1];
+
+  if (upLeft.textContent == now.textContent)
+    return { type: "cross", now };
+  up = Number(up.textContent);
+  left = Number(left.textContent);
+  upLeft = Number(upLeft.textContent) - 1; //edit distance
+  if (up <= left && up <= upLeft)
+    return { type: "del", now };
+  if (left <= up && left <= upLeft)
+    return { type: "add", now };
+  return { type: "cross", now };
+}
+
+function upLefts(table, h, w) {
+  let now = table[h][w];
   if (h <= 1 && w <= 1)
     return { type: "end", now };
+  if (h <= 1)
+    return { type: "add", now };
+  if (w <= 1)
+    return { type: "del", now };
 
   let up = table[h - 1][w];
   let left = table[h][w - 1];
