@@ -19,16 +19,14 @@ export function levenshteinMinimalShifts(A, B) {
 export function* backtrace(table, A, B) {
   const W = B.length + 1;
   let n = table.length - 1;
-  while (n >= 0) {
+  while (n > 0) {
     const y = Math.floor(n / W);
     const x = n % W;
     let a = A[y - 1];
     let b = B[x - 1];
     const now = table[n];
     let type;
-    if (n == 0)
-      type = "end";
-    else if (y == 0)
+    if (y == 0)
       type = "add";
     else if (x == 0)
       type = "del";
@@ -58,22 +56,22 @@ export function* backtrace(table, A, B) {
   }
 }
 
-function unshiftStr(last, a, b) {
-  last.a = a + last.a;
-  last.b = b + last.b;
+export function diff(A, B) {
+  let p;
+  const res = [];
+  for (let { a, b } of backtrace(levenshteinMinimalShifts(A, B), A, B))
+    p && (p.a === p.b) === (a === b) ?
+      ((p.a = a + p.a), (p.b = b + p.b)) :
+      res.unshift(p = { a, b });
+  return res;
 }
 
-export function diff(A, B) {
-  const table = levenshteinMinimalShifts(A, B);
-  const iter = backtrace(table, A, B);
-  const res = []; let last;
-  for (let p of iter) {
-    const { a, b } = p;
-    if (!a && !b) continue;
-    if (last && ((last.a == last.b && a == b) || (last.a != last.b && a != b)))
-      (last.a = a + last.a), (last.b = b + last.b);
-    else
-      res.unshift(last = p);
-  }
+export function diffArray(A, B) {
+  let p;
+  const res = [];
+  for (let { a, b } of backtrace(levenshteinMinimalShifts(A, B), A, B))
+    p && (p.a === p.b) === (a === b) ?
+      (p.a.unshift(a), p.b.unshift(b)) :
+      res.unshift(p = { a: [a], b: [b] });
   return res;
 }

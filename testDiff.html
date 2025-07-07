@@ -70,15 +70,14 @@
   import { diff, backtrace, levenshteinMinimalShifts } from "./difference4.js";
 
   function makePrintableTable(table, bt, A, B) {
-    //merging rows and backtrace
     const res = Array.from(table).map(n => ({ num: `${n >> 16}.${n & 0xFFFF}` }));
     for (let p of bt)
       Object.assign(res[p.n], p);
-
-    //adding captions
-    B = " " + B;
-    A = "  " + A;
-    res.unshift(...B.split("").map(c => ({ num: c })));
+    if (typeof A === "string") A = A.split("");
+    if (typeof B === "string") B = B.split("");
+    A = [" ", " ", ...A];
+    B = [" ", ...B];
+    res.unshift(...B.map(c => ({ num: c })));
     for (let i = 0; i < A.length; i++)
       res.splice(i * (B.length + 1), 0, { num: A[i] });
     return res;
@@ -106,10 +105,12 @@
     const duration = performance.now() - n;
     const quickcheck = actions.map(({ a, b }) => [a.length, b.length]);
     const div = document.createElement("div");
+    document.body.querySelector("div").append(div);
     div.innerHTML =
       actionsToHTML(actions) +
       ((A.length * B.length < 500) ? levenToHTML(table, trace, A, B) : "");
-    document.body.querySelector("div").append(div);
+    if (A instanceof Array) A = A.join("");
+    if (B instanceof Array) B = B.join("");
     return { A, B, table, trace, actions, quickcheck, duration };
   }
 
@@ -142,7 +143,9 @@
   ];
 
   const bigTests = (await import("./testset2.js")).default;
-  for (const [a, b, res] of [...tests, ...bigTests]) {
+  for (let [a, b, res] of [...tests, ...bigTests]) {
+    a = a.split("");
+    b = b.split("");
     const { A, B, quickcheck, duration } = test(a, b);
     const Ax = A.substr(0, 25).replaceAll("\n", "⏎");
     const Bx = B.substr(0, 25).replaceAll("\n", "⏎");
