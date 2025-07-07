@@ -1,0 +1,114 @@
+<style>
+  table {
+    border-collapse: collapse;
+    margin: 10px 0;
+    border: 2px solid darkgreen;
+  }
+
+  th,
+  td {
+    border: 1px solid darkgreen;
+    padding: 5px;
+  }
+
+  td {
+    width: 8ch;
+    height: 8ch;
+    text-align: center;
+  }
+
+  div {
+    margin: 5px 0;
+    border-block: 1px solid lightblue;
+  }
+</style>
+
+<script type="module">
+  function getDocumentLog() {
+    return document.querySelector(".document-log") ?? document.body;
+  }
+
+  function log(...args) {
+    const body = args.map(a => typeof a === "object" ? JSON.stringify(a) : a)
+      .map(a => `<span>${a}</span>`).join("");
+    getDocumentLog().insertAdjacentHTML("beforeend", `<div>${body}</div>`);
+  }
+
+  function table(rows) {
+    const table = document.createElement("table");
+    for (const row of rows) {
+      const tr = document.createElement("tr");
+      for (const a of row) {
+        const td = document.createElement("td");
+        td.textContent = typeof a === "object" ? JSON.stringify(a) : a;
+        tr.appendChild(td);
+      }
+      table.appendChild(tr);
+    }
+    getDocumentLog().appendChild(table);
+  }
+
+  // console.log = log;
+  // console.table = table;
+
+  import { diff, levenshteinLengthWeight } from "./difference.js";
+
+  function printTable(str1, str2) {
+    const resultTable = levenshteinLengthWeight(str1, str2);
+    const formatCell = num => `${num >> 22}|${(num >> 8) & 0x3FFF}|${num & 0xFF}`;
+    const printTable = [
+      ["%", ...str2.split("")],
+      ...resultTable.slice(1).map((r, i) => [str1[i], ...r.slice(1).map(formatCell)])
+    ];
+    console.table(printTable);
+  }
+
+  export function test(str1, str2) {
+    const ops = diff(str1, str2);
+    return [str1 == ops.map(op => op.a).join(""), str2 == ops.map(op => op.b).join("")];
+  }
+
+  export function debugDiff(str1, str2) {
+    console.log("-----------------a Better Diff-------------------------");
+    console.log(str1, "  vs  ", str2);
+    test(str1, str2);
+    const ops = diff(str1, str2);
+    for (const op of ops)
+      console.log(op);
+    printTable(str1, str2);
+  }
+
+  const tests = [
+    ["kitten", "sitting"],
+    ["abc", "def"],
+    ["abc", "abc"],
+    ["a_b_cabc_ab_c", "abc"],
+    ["", ""],
+    ["abc", ""],
+    ["", "abc"],
+    ["a", "b"],
+    ["abcdef", "ghijkl"],
+    ["aaaa", "aa"],
+    ["radar", "radar"],
+    ["abcdef", "abXYef"],
+    ["flaw", "lawn"],
+    ["The quick brown fox", "The quick brown fix"],
+    ["Hello, world!", "Hello world"],
+  ];
+
+  for (const [a, b] of tests)
+    debugDiff(a, b);
+  const res = tests.map((ab) => [...test(...ab), ...ab]);
+  console.table(res);
+
+  const bigTests = (await import("./testset2.js")).default;
+  for (const [a, b] of bigTests) {
+    debugger
+
+    const diffs = diff(a, b);
+    console.log(diffs);
+  }
+  // console.log("All tests completed.");
+  // console.log("Check the console for results.");
+
+</script>
