@@ -56,7 +56,9 @@ export function* backtrace(table, A, B) {
   }
 }
 
-export function diff(A, B) {
+export function diffRaw(A, B) {
+  if (!A.length && !B.length) return [];
+  if (!A.length || !B.length) return [{ a: A, b: B }];
   let p, res = [];
   for (let { a, b } of backtrace(levenshteinMinimalShifts(A, B), A, B))
     p && (p.a === p.b) === (a === b) ?
@@ -65,11 +67,57 @@ export function diff(A, B) {
   return res;
 }
 
-export function diffArray(A, B) {
-  let p, res = [];
-  for (let { a, b } of backtrace(levenshteinMinimalShifts(A, B), A, B))
-    p && (p.a === p.b) === (a === b) ?
-      (p.a.unshift(a), p.b.unshift(b)) :
-      res.unshift(p = { a: [a], b: [b] });
+function mostCommonCharRegex(str) {
+  let freq = {}, winner = '', winnerVal = 0;
+  for (let c of str) {
+    const n = freq[c] = (freq[c] || 0) + 1;
+    if (n > winnerVal)
+      (winner = c), (winnerVal = n);
+  }
+  return winner.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s/g, '\\s');
+}
+
+function findStartEnd(a, b) {
+  let start = 0, end = 0;
+  while (start < a.length && start < b.length && a[start] === b[start]) start++;
+  while (end < a.length - start && end < b.length - start && a[a.length - end - 1] === b[b.length - end - 1]) end++;
+  return { start, end };
+}
+
+function extractUnions(res) {
+  res[0].a !== res[0].b && res.unshift({ a: "", b: "" });
+  res.at(-1).a !== res.at(-1).b && res.push({ a: "", b: "" });
+  for (let i = 1; i < res.length; i += 2) {
+    const { a, b } = res[i];
+    const { start, end } = findStartEnd(a, b);
+    if (start) {
+      res[i - 1].a += a.slice(0, start);
+      res[i - 1].b += b.slice(0, start);
+    }
+    if (end) {
+      res[i + 1].a = a.slice(a.length - end) + res[i + 1].a;
+      res[i + 1].b = b.slice(b.length - end) + res[i + 1].b;
+    }
+    if (start || end) {
+      res[i].a = a.slice(start, a.length - end);
+      res[i].b = b.slice(start, b.length - end);
+    }
+  }
+  !res[0].a && !res[0].b && res.shift();
+  !res.at(-1).a && !res.at(-1).b && res.pop();
   return res;
+}
+
+export function diff(A, B) {
+  if ((A.length * B.length) < 1_000_000)
+    return diffRaw(A, B);
+  const regEx = new RegExp(`(${mostCommonCharRegex(A)}+)`, "g");
+  const AA = A.split(regEx);
+  const BB = B.split(regEx);
+  !AA[0] && AA.shift();
+  !BB[0] && BB.shift();
+  !AA.at(-1) && AA.pop();
+  !BB.at(-1) && BB.pop();
+  const res = diffRaw(AA, BB);
+  return extractUnions(res);
 }

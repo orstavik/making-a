@@ -67,9 +67,9 @@
 <div></div>
 
 <script type="module">
-  import { diff, backtrace, levenshteinMinimalShifts } from "./difference4.js";
+  import { diffRaw, diff, backtrace, levenshteinMinimalShifts } from "./difference4.js";
 
-  function makePrintableTable(table, bt, A, B) {
+  function tableWithTrace(table, bt, A, B) {
     const res = Array.from(table).map(n => ({ num: `${n >> 16}.${n & 0xFFFF}` }));
     for (let p of bt)
       Object.assign(res[p.n], p);
@@ -83,8 +83,18 @@
     return res;
   }
 
+  function test(A, B) {
+    const table = levenshteinMinimalShifts(A, B);
+    const trace = [...backtrace(table, A, B)];
+    const n = performance.now();
+    const actions = diff(A, B);
+    const duration = performance.now() - n;
+    return { table, trace, actions, duration };
+  }
+
+
   function levenToHTML(rows, bt, A, B) {
-    const table = makePrintableTable(rows, bt, A, B);
+    const table = tableWithTrace(rows, bt, A, B);
     return `<div class="mono" style="grid-template-columns: repeat(${B.length + 2}, max-content);">
       ${table.map(({ num, type = "", a = "", b = "" }) =>
       `<div class="${type}" a="${a}" b="${b}">${num}</div>`).join("\n")}
@@ -95,23 +105,6 @@
     return `<div class="actions">
       ${actions.map(({ a, b }) => `<div>${a == b ? "=" : !a ? "+" : !b ? "-" : "*"}  ${a.replaceAll("<", "&lt;")} / ${b.replaceAll("<", "&lt;")}</div>`).join("\n")}
     </div>`;
-  }
-
-  function test(A, B) {
-    const table = levenshteinMinimalShifts(A, B);
-    const trace = [...backtrace(table, A, B)];
-    const n = performance.now();
-    const actions = diff(A, B);
-    const duration = performance.now() - n;
-    const quickcheck = actions.map(({ a, b }) => [a.length, b.length]);
-    const div = document.createElement("div");
-    document.body.querySelector("div").append(div);
-    div.innerHTML =
-      actionsToHTML(actions) +
-      ((A.length * B.length < 500) ? levenToHTML(table, trace, A, B) : "");
-    if (A instanceof Array) A = A.join("");
-    if (B instanceof Array) B = B.join("");
-    return { A, B, table, trace, actions, quickcheck, duration };
   }
 
   const tests = [
@@ -143,10 +136,16 @@
   ];
 
   const bigTests = (await import("./testset2.js")).default;
-  for (let [a, b, res] of [...tests, ...bigTests]) {
-    a = a.split("");
-    b = b.split("");
-    const { A, B, quickcheck, duration } = test(a, b);
+  for (let [A, B, res] of [...tests, ...bigTests]) {
+    const { table, trace, actions, duration } = test(A, B);
+    const quickcheck = actions.map(({ a, b }) => [a.length, b.length]);
+
+    const div = document.createElement("div");
+    document.body.querySelector("div").append(div);
+    div.innerHTML =
+      actionsToHTML(actions) +
+      ((A.length * B.length < 500) ? levenToHTML(table, trace, A, B) : "");
+
     const Ax = A.substr(0, 25).replaceAll("\n", "⏎");
     const Bx = B.substr(0, 25).replaceAll("\n", "⏎");
     JSON.stringify(quickcheck) === JSON.stringify(res) ?
