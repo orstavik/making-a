@@ -4,8 +4,8 @@ const STREAKEND = 1;
 export function levenshteinMinimalShifts(A, B) {
   const H = A.length, W = B.length, H2 = H + 1, W2 = W + 1;
   const res = new Uint32Array(H2 * W2);
-  for (let i = 1; i <= W2; i++) res[i] = i * EDIT + (i - 1) * STREAKEND;
-  for (let i = 1; i <= H2; i++) res[i * W2] = i * EDIT + (i - 1) * STREAKEND;
+  for (let i = 1; i < W2; i++) res[i] = i * EDIT + (i - 1) * STREAKEND;
+  for (let i = 1; i < H2; i++) res[i * W2] = i * EDIT + (i - 1) * STREAKEND;
   for (let y1 = 0, y2 = 1; y1 < H; y1++, y2++)
     for (let x1 = 0, x2 = 1; x1 < W; x1++, x2++)
       res[y2 * W2 + x2] = Math.min(
