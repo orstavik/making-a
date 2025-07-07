@@ -58,103 +58,22 @@ export function* backtrace(table, A, B) {
   }
 }
 
-export function diff(A, B) {
-  const table = levenshteinMinimalShifts(A, B);
-  const res = [];
-  let last = { a: "", b: "" };
-  for (let { a, b } of backtrace(table, A, B)) {
-    if (!a && !b) {
-      if (last.a || last.b)
-        res.unshift(last);
-      return res;
-    } else if (last.a == last.b && a == b) {
-      last.a = a + last.a;
-      last.b = b + last.b;
-    } else if (last.a != last.b && a != b) {
-      last.a = a + last.a;
-      last.b = b + last.b;
-    } else {
-      if (last.a || last.b)
-        res.unshift(last);
-      last = { a, b };
-    }
-  }
-  throw new Error("No end found in backtrace");
+function unshiftStr(last, a, b) {
+  last.a = a + last.a;
+  last.b = b + last.b;
 }
 
-
-// export function diffAsArray(A, B) {
-//   const table = levenshteinMinimalShifts(A, B);
-//   const res = [];
-//   let now, i = table.length - 1, j = table[0].length - 1;
-//   while (i > 0 && j > 0 && (now = table[i][j])) {
-//     const equals = now & 0xFF;
-//     if (equals) {
-//       i -= equals;
-//       j -= equals;
-//       const a = A.slice(i, i + equals);
-//       res.unshift({ a });
-//     } else {
-//       const topLeft = table[i - 1][j - 1], top = table[i - 1][j], left = table[i][j - 1];
-//       if (!res[0]?.b) res.unshift({ a: [], b: [] });
-//       if ((topLeft >= top && topLeft >= left) || top >= left)
-//         res[0].a.unshift(A[--i]);
-//       if ((topLeft >= top && topLeft >= left) || left > top)
-//         res[0].b.unshift(B[--j]);
-//     }
-//   }
-//   if (i || j)
-//     res.unshift({ a: A.slice(0, i), b: B.slice(0, j) });
-//   return res;
-// }
-
-// export function diffAsStr(A, B) {
-//   const table = levenshteinMinimalShifts(A, B);
-//   const res = [];
-//   let now, i = table.length - 1, j = table[0].length - 1;
-//   while (i >= 0 && j >= 0 && (now = table[i][j])) {
-//     const equals = now & 0xFF;
-//     if (equals) {
-//       i -= equals;
-//       j -= equals;
-//       const str = A.slice(i, i + equals).join("");
-//       res.unshift({ a: str, b: str });
-//     } else {
-//       const topLeft = table[i - 1][j - 1], top = table[i - 1][j], left = table[i][j - 1];
-//       const a = (topLeft >= top && topLeft >= left) || top >= left ? A[--i] : "";
-//       const b = (topLeft >= top && topLeft >= left) || left > top ? B[--j] : "";
-//       res[0]?.a == res[0]?.b ? res.unshift({ a, b }) :
-//         (res[0].a = a + res[0].a, res[0].b = b + res[0].b);
-//     }
-//   }
-//   if (i || j)
-//     res.unshift({ a: A.slice(0, i).join(""), b: B.slice(0, j).join("") });
-//   return res;
-// }
-
-// export function diff(A, B) {
-//   const table = levenshteinLengthWeight(A, B);
-//   const height = A.length;
-//   const width = B.length;
-
-//   const res = [];
-//   let now, i = height - 1, j = width.length - 1;
-//   while (i > 0 && j > 0 && (now = table[i][j])) {
-//     const equals = A[i] === B[j];
-//     if (equals) {
-//       i -= 1;
-//       j -= 1;
-//       const str = A.slice(i, i + 1);
-//       res.unshift({ a: str, b: str });
-//     } else {
-//       const topLeft = table[i - 1][j - 1], top = table[i - 1][j], left = table[i][j - 1];
-//       const a = (topLeft >= top && topLeft >= left) || top >= left ? A[--i] : "";
-//       const b = (topLeft >= top && topLeft >= left) || left > top ? B[--j] : "";
-//       res[0]?.a == res[0]?.b ? res.unshift({ a, b }) :
-//         (res[0].a = a + res[0].a, res[0].b = b + res[0].b);
-//     }
-//   }
-//   if (i || j)
-//     res.unshift({ a: A.slice(0, i), b: B.slice(0, j) });
-//   return res;
-// }
+export function diff(A, B) {
+  const table = levenshteinMinimalShifts(A, B);
+  const iter = backtrace(table, A, B);
+  const res = []; let last;
+  for (let p of iter) {
+    const { a, b } = p;
+    if (!a && !b) continue;
+    if (last && ((last.a == last.b && a == b) || (last.a != last.b && a != b)))
+      (last.a = a + last.a), (last.b = b + last.b);
+    else
+      res.unshift(last = p);
+  }
+  return res;
+}
