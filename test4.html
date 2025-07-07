@@ -69,22 +69,29 @@
 <script type="module">
   import { diff, backtrace, levenshteinMinimalShifts } from "./difference4.js";
 
+  function makePrintableTable(table, bt, A, B) {
+    //merging rows and backtrace
+    const res = Array.from(table).map(n => ({ num: `${n >> 16}.${n & 0xFFFF}` }));
+    for (let p of bt)
+      Object.assign(res[p.n], p);
+
+    //adding captions
+    B = " " + B;
+    A = "  " + A;
+    res.unshift(...B.split("").map(c => ({ num: c })));
+    for (let i = 0; i < A.length; i++)
+      res.splice(i * (B.length + 1), 0, { num: A[i] });
+    return res;
+  }
+
   function printGrid(rows, bt, actions, A, B) {
+    const table = makePrintableTable(rows, bt, A, B);
     const res = document.createElement("div");
     res.innerHTML = `<div class="mono" style="grid-template-columns: repeat(${B.length + 2}, max-content);">
-      ${Array.from(rows).map(n => `<div a="" b="">${n >> 16}.${n & 0xFFFF}</div>`).join("")}
-    </div>`;
-    const children = res.lastElementChild.children;
+      ${table.map(({ num, type = "", a = "", b = "" }) =>
+      `<div class="${type}" a="${a}" b="${b}">${num}</div>`).join("\n")}
+      </div>`;
 
-    for (let p of bt) {
-      children[p.n].classList.add(p.type);
-      p.a && children[p.n].setAttribute("a", p.a);
-      p.b && children[p.n].setAttribute("b", p.b);
-    }
-    children[0].insertAdjacentHTML("beforebegin", (" " + B).split("").map(c => `<div>${c}</div>`).join(""));
-    A = "  " + A;
-    for (let i = 0; i < A.length; i++)
-      children[i * (B.length + 2)].insertAdjacentHTML("beforebegin", `<div>${A[i]}</div>`);
     res.insertAdjacentHTML("afterbegin",
       `<div class="actions">
       ${actions.map(({ a, b }) => `<div>${a == b ? "=" : !a ? "+" : !b ? "-" : "*"}  ${a} / ${b}</div>`).join("\n")}
@@ -133,10 +140,7 @@
 
   const bigTests = (await import("./testset2.js")).default;
   for (const [a, b] of bigTests) {
-    // debugger
-    // test(a, b);
-    // const diffs = diff(a, b);
-    // console.log(diffs);
+    // test2(a, b);    // debugger
   }
 
 </script>
