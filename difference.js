@@ -12,7 +12,7 @@ export function levenshteinMinimalShifts(A, B) {
       res[y2 * W2 + x2] = Math.min(
         res[y1 * W2 + x2] + EDITSTREAK,
         res[y2 * W2 + x1] + EDITSTREAK,
-        res[y1 * W2 + x1] + (A[y1] != B[x1] ? EDITSTREAK : A[y2] != B[x2] || y2 == H ? STREAKEND : 0)
+        res[y1 * W2 + x1] + (A[y1] != B[x1] ? EDITSTREAK : A[y2] != B[x2] || y2 == H || x2 == W ? STREAKEND : 0)
       );
   return res;
 }
@@ -57,6 +57,20 @@ export function* backtrace(table, A, B) {
   }
 }
 
+function hackTrace(res) {
+  if (res[1].a === res[2].a && !res[2].b) {
+    res[0].a += res[2].a;
+    res.pop();
+    return res;
+  }
+  if (res[1].b === res[2].b && !res[2].a) {
+    res[0].b += res[2].b;
+    res.pop();
+    return res;
+  }
+  return res;
+}
+
 export function diffRaw(A, B) {
   if (!A.length && !B.length) return [];
   if (!A.length || !B.length) return [{ a: A, b: B }];
@@ -65,17 +79,29 @@ export function diffRaw(A, B) {
     p && (p.a === p.b) === (a === b) ?
       ((p.a = a + p.a), (p.b = b + p.b)) :
       res.unshift(p = { a, b });
+  if (res.length === 3 && !res[0].b && !res[2].b && res[1].a === res[1].b && res[1].a === res[2].a)
+    return (res[0].a += res[2].a), res.slice(0, 2);
+  if (res.length === 3 && !res[0].a && !res[2].a && res[1].a === res[1].b && res[1].a === res[2].b)
+    return (res[0].b += res[2].b), res.slice(0, 2);
+  // return hackTrace(res);
   return res;
 }
 
-function mostCommonCharRegex(str) {
+function splitOnMostCommonCharRegex(...strs) {
   let freq = {}, winner = '', winnerVal = 0;
-  for (let c of str) {
+  for (let c of strs[0]) {
     const n = freq[c] = (freq[c] || 0) + 1;
     if (n > winnerVal)
       (winner = c), (winnerVal = n);
   }
-  return winner.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s/g, '\\s');
+  winner = winner.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s/g, '\\s');
+  const regEx = new RegExp(`(${winner}+)`, "g");
+  return strs.map(str => {
+    str = str.split(regEx);
+    !str[0] && str.shift();
+    !str.at(-1) && str.pop();
+    return str;
+  });
 }
 
 function secondStep(diffs) {
@@ -100,13 +126,7 @@ function secondStep(diffs) {
 export function diff(A, B) {
   if ((A.length * B.length) < 1_000_000)
     return diffRaw(A, B);
-  const regEx = new RegExp(`(${mostCommonCharRegex(A)}+)`, "g");
-  const AA = A.split(regEx);
-  const BB = B.split(regEx);
-  !AA[0] && AA.shift();
-  !BB[0] && BB.shift();
-  !AA.at(-1) && AA.pop();
-  !BB.at(-1) && BB.pop();
+  const [AA, BB] = splitOnMostCommonCharRegex(A, B);
   const diffs = diffRaw(AA, BB);
   return secondStep(diffs);
 }
