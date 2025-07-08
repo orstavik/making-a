@@ -126,6 +126,5 @@ export function diff(A, B) {
   if ((A.length * B.length) < 1_000_000)
     return diffRaw(A, B);
   const [AA, BB] = splitOnMostCommonCharRegex(A, B);
-  const diffs = diffRaw(AA, BB);
-  return secondStep(diffs);
+  return secondStep(diffRaw(AA, BB));
 }
