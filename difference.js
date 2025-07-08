@@ -1,17 +1,18 @@
 const EDIT = 1 << 16;
 const STREAKEND = 1;
+const EDITSTREAK = EDIT + STREAKEND;
 
 export function levenshteinMinimalShifts(A, B) {
   const H = A.length, W = B.length, H2 = H + 1, W2 = W + 1;
   const res = new Uint32Array(H2 * W2);
-  for (let i = 1; i < W2; i++) res[i] = i * EDIT + (i - 1) * STREAKEND;
-  for (let i = 1; i < H2; i++) res[i * W2] = i * EDIT + (i - 1) * STREAKEND;
+  for (let i = 1; i < W2; i++) res[i] = i * EDITSTREAK;
+  for (let i = 1; i < H2; i++) res[i * W2] = i * EDITSTREAK;
   for (let y1 = 0, y2 = 1; y1 < H; y1++, y2++)
     for (let x1 = 0, x2 = 1; x1 < W; x1++, x2++)
       res[y2 * W2 + x2] = Math.min(
-        res[y1 * W2 + x2] + EDIT + STREAKEND,
-        res[y2 * W2 + x1] + EDIT + STREAKEND,
-        res[y1 * W2 + x1] + (A[y1] != B[x1] ? EDIT + STREAKEND : A[y2] != B[x2] || y2 == H ? STREAKEND : 0)
+        res[y1 * W2 + x2] + EDITSTREAK,
+        res[y2 * W2 + x1] + EDITSTREAK,
+        res[y1 * W2 + x1] + (A[y1] != B[x1] ? EDITSTREAK : A[y2] != B[x2] || y2 == H ? STREAKEND : 0)
       );
   return res;
 }
@@ -77,35 +78,23 @@ function mostCommonCharRegex(str) {
   return winner.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s/g, '\\s');
 }
 
-function findStartEnd(a, b) {
-  let start = 0, end = 0;
-  while (start < a.length && start < b.length && a[start] === b[start]) start++;
-  while (end < a.length - start && end < b.length - start && a[a.length - end - 1] === b[b.length - end - 1]) end++;
-  return { start, end };
-}
+function secondStep(diffs) {
+  const diffs2 = diffs.map(p =>
+    p.a === p.b || !p.a || !p.b ? p :
+      diffRaw(p.a, p.b)).flat();
 
-function extractUnions(res) {
-  res[0].a !== res[0].b && res.unshift({ a: "", b: "" });
-  res.at(-1).a !== res.at(-1).b && res.push({ a: "", b: "" });
-  for (let i = 1; i < res.length; i += 2) {
-    const { a, b } = res[i];
-    const { start, end } = findStartEnd(a, b);
-    if (start) {
-      res[i - 1].a += a.slice(0, start);
-      res[i - 1].b += b.slice(0, start);
-    }
-    if (end) {
-      res[i + 1].a = a.slice(a.length - end) + res[i + 1].a;
-      res[i + 1].b = b.slice(b.length - end) + res[i + 1].b;
-    }
-    if (start || end) {
-      res[i].a = a.slice(start, a.length - end);
-      res[i].b = b.slice(start, b.length - end);
+  const diffs3 = [];
+  let last = diffs3[0] = diffs2[0];
+  for (let i = 1; i < diffs2.length; i++) {
+    const n = diffs2[i];
+    if ((n.a === n.b) === (last.a === last.b)) {
+      last.a += n.a;
+      last.b += n.b;
+    } else {
+      diffs3.push(last = n);
     }
   }
-  !res[0].a && !res[0].b && res.shift();
-  !res.at(-1).a && !res.at(-1).b && res.pop();
-  return res;
+  return diffs3;
 }
 
 export function diff(A, B) {
@@ -118,6 +107,6 @@ export function diff(A, B) {
   !BB[0] && BB.shift();
   !AA.at(-1) && AA.pop();
   !BB.at(-1) && BB.pop();
-  const res = diffRaw(AA, BB);
-  return extractUnions(res);
+  const diffs = diffRaw(AA, BB);
+  return secondStep(diffs);
 }

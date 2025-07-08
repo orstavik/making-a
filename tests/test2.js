@@ -1,6 +1,5 @@
 export default [
-  [
-    `<div template:="" i::fetch:embrace="SerSeaEpi.json">
+  `<div template:="" i::fetch:embrace="SerSeaEpi.json">
   <h2>List of Series ("series" is an array? true)</h2>
   <ol>
     <li>
@@ -57,6 +56,5 @@ export default [
         </li>
         <li>
     `,
-    [[0, 1], [1166, 1166], [0, 16], [212, 212], [0, 4]]
-  ]
-]
+  [[0, 1], [1166, 1166], [0, 1], [1, 1], [0, 15], [211, 211], [0, 4]]
+];

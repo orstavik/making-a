@@ -108,6 +108,7 @@
   }
 
   const tests = [
+    ["a", "baa", [[0, 2], [1, 1]]],
     ["aby", "abx", [[2, 2], [1, 1]]],
     ["ab", "ab_a_bxx", [[2, 2], [0, 6]]],
     ["ab", "a_b_abxx", [[0, 4], [2, 2], [0, 2]]],
@@ -127,7 +128,7 @@
     ["abc", "", [[3, 0]]],
     ["", "abc", [[0, 3]]],
     ["abcdef", "ghijkl", [[6, 6]]],
-    ["aaaa", "aa", [[1, 0], [2, 2], [1, 0]]],
+    ["aaaa", "aa", [[2, 2], [2, 0]]],
     ["radar", "radar", [[5, 5]]],
     ["abcdef", "abXYef", [[2, 2], [2, 2], [2, 2]]],
     ["flaw", "lawn", [[1, 0], [3, 3], [0, 1]]],
@@ -135,8 +136,7 @@
     ["Hello, world!", "Hello world", [[5, 5], [1, 0], [6, 6], [1, 0]]]
   ];
 
-  const bigTests = (await import("./testset.js")).default;
-  for (let [A, B, res] of [...tests, ...bigTests]) {
+  function runTest(A, B, res) {
     const { table, trace, actions, duration } = test(A, B);
     const quickcheck = actions.map(({ a, b }) => [a.length, b.length]);
 
@@ -152,4 +152,9 @@
       console.log(`✅${duration.toFixed(1)}🕓 ${Ax} ⚔️ ${Bx} `) :
       console.error(`❌ ${Ax} ⚔️ ${Bx}\nexpected:\n${JSON.stringify(res)}\n, got:\n${JSON.stringify(quickcheck)}`);
   }
+
+  for (let [A, B, res] of tests)
+    runTest(A, B, res);
+  runTest(...(await import("./tests/test1.js")).default)
+  runTest(...(await import("./tests/test2.js")).default)
 </script>
