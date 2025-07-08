@@ -122,6 +122,7 @@ function secondStep(diffs) {
   return diffs3;
 }
 
+//enter here
 export function diff(A, B) {
   if ((A.length * B.length) < 1_000_000)
     return diffRaw(A, B);
