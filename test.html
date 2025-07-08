@@ -149,6 +149,7 @@
     const { table, trace, actions, duration } = test(A, B);
     const quickcheck = actions.map(({ a, b }) => [a.length, b.length]);
     const noMatch = quickcheck.findIndex((actual, i) => JSON.stringify(actual) !== JSON.stringify(res[i]));
+    const wsOnly = actions.every(({ a, b }, i) => a == b || !(a + b).trim());
     const Ax = A.substr(0, 25).replaceAll("\n", "⏎");
     const Bx = B.substr(0, 25).replaceAll("\n", "⏎");
 
@@ -161,9 +162,9 @@
 
     noMatch >= 0 ?
       console.error(
-        `❌ ${duration.toFixed(1)}🕓 ${Ax} ⚔️ ${Bx}\n`,
+        `❌${wsOnly ? `👻` : ""} ${duration.toFixed(1)}🕓 ${Ax} ⚔️ ${Bx}\n`,
         `didn't expect this action #${noMatch}: ${JSON.stringify(actions[noMatch])}`) :
-      console.log(`✅ ${duration.toFixed(1)}🕓 ${Ax} ⚔️ ${Bx}`);
+      console.log(`✅${wsOnly ? `👻` : ""} ${duration.toFixed(1)}🕓 ${Ax} ⚔️ ${Bx}`);
 
   }
 
@@ -171,4 +172,5 @@
     runTest(A, B, res);
   runTest(...(await import("./tests/test1.js")).default)
   runTest(...(await import("./tests/test2.js")).default)
+  runTest(...(await import("./tests/test3.js")).default)
 </script>

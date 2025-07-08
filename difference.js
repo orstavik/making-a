@@ -1,7 +1,6 @@
 const EDIT = 1 << 16;
 const STREAKEND = 1;
 const EDITSTREAK = EDIT + STREAKEND;
-const DBLEDITSTREAK = 2 * EDITSTREAK;
 
 export function levenshteinMinimalShifts(A, B) {
   const H = A.length, W = B.length, H2 = H + 1, W2 = W + 1;
@@ -13,7 +12,7 @@ export function levenshteinMinimalShifts(A, B) {
       res[y2 * W2 + x2] = Math.min(
         res[y1 * W2 + x2] + EDITSTREAK,
         res[y2 * W2 + x1] + EDITSTREAK,
-        res[y1 * W2 + x1] + (A[y1] != B[x1] ? DBLEDITSTREAK : A[y2] != B[x2] || y2 == H || x2 == W ? STREAKEND : 0)
+        A[y1] == B[x1] ? res[y1 * W2 + x1] + (A[y2] != B[x2] || y2 == H || x2 == W ? STREAKEND : 0) : Infinity
       );
   return res;
 }
@@ -73,23 +72,6 @@ export function diffRaw(A, B) {
   return res;
 }
 
-function splitOnMostCommonCharRegex(...strs) {
-  let freq = {}, winner = '', winnerVal = 0;
-  for (let c of strs[0]) {
-    const n = freq[c] = (freq[c] || 0) + 1;
-    if (n > winnerVal)
-      (winner = c), (winnerVal = n);
-  }
-  winner = winner.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s/g, '\\s');
-  const regEx = new RegExp(`(${winner}+)`, "g");
-  return strs.map(str => {
-    str = str.split(regEx);
-    !str[0] && str.shift();
-    !str.at(-1) && str.pop();
-    return str;
-  });
-}
-
 function secondStep(diffs) {
   const diffs2 = diffs.map(p =>
     p.a === p.b || !p.a || !p.b ? p :
@@ -109,10 +91,8 @@ function secondStep(diffs) {
   return diffs3;
 }
 
-//enter here
 export function diff(A, B) {
-  if ((A.length * B.length) < 1_000_000)
-    return diffRaw(A, B);
-  const [AA, BB] = splitOnMostCommonCharRegex(A, B);
-  return secondStep(diffRaw(AA, BB));
+  return (A.length * B.length) < 1_000_000 ?
+    diffRaw(A, B) :
+    secondStep(diffRaw(A.split(/\b/), B.split(/\b/)));
 }
