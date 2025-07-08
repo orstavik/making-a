@@ -1,6 +1,7 @@
 const EDIT = 1 << 16;
 const STREAKEND = 1;
 const EDITSTREAK = EDIT + STREAKEND;
+const DBLEDITSTREAK = 2 * EDITSTREAK;
 
 export function levenshteinMinimalShifts(A, B) {
   const H = A.length, W = B.length, H2 = H + 1, W2 = W + 1;
@@ -12,7 +13,7 @@ export function levenshteinMinimalShifts(A, B) {
       res[y2 * W2 + x2] = Math.min(
         res[y1 * W2 + x2] + EDITSTREAK,
         res[y2 * W2 + x1] + EDITSTREAK,
-        res[y1 * W2 + x1] + (A[y1] != B[x1] ? EDITSTREAK : A[y2] != B[x2] || y2 == H || x2 == W ? STREAKEND : 0)
+        res[y1 * W2 + x1] + (A[y1] != B[x1] ? DBLEDITSTREAK : A[y2] != B[x2] || y2 == H || x2 == W ? STREAKEND : 0)
       );
   return res;
 }
@@ -55,20 +56,6 @@ export function* backtrace(table, A, B) {
     if (type != "del") n -= 1;
     if (type != "add") n -= W;
   }
-}
-
-function hackTrace(res) {
-  if (res[1].a === res[2].a && !res[2].b) {
-    res[0].a += res[2].a;
-    res.pop();
-    return res;
-  }
-  if (res[1].b === res[2].b && !res[2].a) {
-    res[0].b += res[2].b;
-    res.pop();
-    return res;
-  }
-  return res;
 }
 
 export function diffRaw(A, B) {
