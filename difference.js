@@ -83,7 +83,6 @@ export function diffRaw(A, B) {
     return (res[0].a += res[2].a), res.slice(0, 2);
   if (res.length === 3 && !res[0].a && !res[2].a && res[1].a === res[1].b && res[1].a === res[2].b)
     return (res[0].b += res[2].b), res.slice(0, 2);
-  // return hackTrace(res);
   return res;
 }
 
