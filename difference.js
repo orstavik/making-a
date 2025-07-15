@@ -63,20 +63,19 @@ export function* backtrace(table, A, B) {
 }
 
 export function diffRaw(A, B) {
-  if (!A.length && !B.length) return [];
   const empty = A instanceof Array || B instanceof Array ? Object.freeze([]) : "";
-  if (!A.length) return [{ type: "add", a: empty, b: B, x: 0, y: 0 }];
-  if (!B.length) return [{ type: "del", a: A, b: empty, x: 0, y: 0 }];
 
-  let p, res = [];
-  for (let x of backtrace(levenshteinMinimalShifts(A, B), A, B))
-    p && (p.a === p.b) === (x.a === x.b) ? //todo this doesn't work for arrays. JSON.stringify?
-      ((p.a = x.a.concat(p.a)), (p.b = x.b.concat(p.b))) :
-      res.unshift(p = x);
+  const res = diffImpl(A, B);
+  for (let d of res) {
+    d.aa = d.type === "add" ? empty : A.slice(d.y, d.y + d.i);
+    d.bb = d.type === "del" ? empty : B.slice(d.x, d.x + d.i);
+    d.a = d.aa instanceof Array ? d.aa.join("") : d.aa;
+    d.b = d.bb instanceof Array ? d.bb.join("") : d.bb;
+  }
   if (res.length === 3 && !res[0].b && !res[2].b && res[1].a === res[1].b && res[1].a === res[2].a)
-    return (res[0].a = res[0].a.concat(res[2].a)), res.slice(0, 2);
+    return (res[0].a = res[0].a.concat(res[2].a)), (res[0].aa = res[0].aa.concat(res[2].aa)), res.slice(0, 2);
   if (res.length === 3 && !res[0].a && !res[2].a && res[1].a === res[1].b && res[1].a === res[2].b)
-    return (res[0].b = res[0].b.concat(res[2].b)), res.slice(0, 2);
+    return (res[0].b = res[0].b.concat(res[2].b)), (res[0].bb = res[0].bb.concat(res[2].bb)), res.slice(0, 2);
   return res;
 }
 
@@ -95,48 +94,30 @@ function secondStep(diffs) {
   return diffs3;
 }
 
-function thirdStep(diffs) {
-  const empty = diffs[0]?.a instanceof Array ? Object.freeze([]) : "";
-  return diffs.flatMap(p =>
-    p.a && p.b && p.a !== p.b ? [{ type: "del", a: p.a, b: empty }, { type: "add", a: empty, b: p.b }] : p);
-}
-
 export function diff(A, B) {
   if (A instanceof Array || B instanceof Array || (A.length * B.length) < 1_000_000)
-    return thirdStep(diffRaw(A, B));
+    return diffRaw(A, B);
   const Aw = A.split(/\b/), Bw = B.split(/\b/);
   if ((Aw.length * Bw.length) < 1_000_000)
-    return thirdStep(secondStep(diffRaw(Aw, Bw)));
+    return secondStep(diffRaw(Aw, Bw));
   //todo untested..
-  return thirdStep(secondStep(diffRaw(A.split(/(\r?\n)/), B.split(/(\r?\n)/))));
+  return secondStep(diffRaw(A.split(/(\r?\n)/), B.split(/(\r?\n)/)));
 }
-
-// const res2 = [...backtrace(levenshteinMinimalShifts(A, B), A, B)]
-// if (res2.length <= 1) return res2;
-// let p2, res3 = [res2[0]];
-// for (let i = 1; i <= res2.length; i++) {
-//   const x = res2[i];
-//   (p.a === p.b) === (x.a === x.b) ?
-//     ((p.a = x.a.concat(p.a)), (p.b = x.b.concat(p.b))) : //todo here i need to make it both as an array and as a string
-//     res.unshift(p = x);
-// }
-// debugger
-
 
 
 export function* backtrace2(table, A, B) {
   const W = B.length + 1;
   let n = table.length - 1;
   while (n > 0) {
-    const y = Math.floor(n / W);
-    const x = n % W;
-    let a = A[y - 1];
-    let b = B[x - 1];
+    const y = Math.floor(n / W) - 1;
+    const x = (n % W) - 1;
+    const a = A[y];
+    const b = B[x];
     const now = table[n];
     let type;
-    if (y == 0)
+    if (y < 0)
       type = "add";
-    else if (x == 0)
+    else if (x < 0)
       type = "del";
     else {
       let upLeft = table[n - W - 1];
@@ -156,13 +137,11 @@ export function* backtrace2(table, A, B) {
           type = "cross";
       }
     }
-    if (type == "add") a = "";
-    if (type == "del") b = "";
     if (type == "cross") {
-      yield { type: "del", now, n, x, y, a, b: "" };
-      yield { type: "add", now, n, x, y, a: "", b };
+      yield { type: "add", x, y, i: 1 };
+      yield { type: "del", x, y, i: 1 };
     } else {
-      yield { type, now, n, x, y, a, b };
+      yield { type, x, y, i: 1 };
     }
     if (type != "del") n -= 1;
     if (type != "add") n -= W;
@@ -171,6 +150,22 @@ export function* backtrace2(table, A, B) {
 
 function diffImpl(A, B) {
   if (!A.length && !B.length) return [];
-  if (!A.length) return [{ type: "add", x: 0, y: 0, l: B.length }];
-  if (!B.length) return [{ type: "del", x: 0, y: 0, l: A.length }];
+  if (!A.length) return [{ type: "add", x: 0, y: 0, i: B.length }];
+  if (!B.length) return [{ type: "del", x: 0, y: 0, i: A.length }];
+  let res = [], mn, ma, md;
+  for (let n of backtrace2(levenshteinMinimalShifts(A, B), A, B)) {
+    if (!mn && n.type === "match")
+      (ma = md = undefined), res.unshift(mn = n);
+    else if (!ma && n.type === "add")
+      (mn = undefined), res.unshift(ma = n);
+    else if (!md && n.type === "del")
+      (mn = undefined), res.unshift(md = n);
+    else if (n.type === "match")
+      mn.i++, mn.x = n.x, mn.y = n.y;
+    else if (n.type === "add")
+      ma.i++, ma.x = n.x, ma.y = n.y;
+    else if (n.type === "del")
+      md.i++, md.x = n.x, md.y = n.y;
+  }
+  return res;
 }
