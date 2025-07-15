@@ -147,30 +147,14 @@ export function backtrace2(table, A, B) {
     if (type === "match")
       mn ? (mn.i++, mn.x = x, mn.y = y) :
         res.unshift(mn = { type, x, y, i: 1 });
-    if (type === "add") {
-      md && (md.x = x - 1);
-      ma ? (ma.i++, ma.x = x) : //, ma.y = y
+    if (type === "add" || type === "cross")
+      ma ? (ma.i++, ma.x = x) :
         res.unshift(ma = { type: "add", x, y, i: 1 });
-    }
-    if (type === "del")
-      md ? (md.i++, md.y = y) : // md.x = x, 
+    if (type === "del" || type === "cross")
+      md ? (md.i++, md.y = y) :
         res.unshift(md = { type: "del", x, y, i: 1 });
-    if (type === "cross") {
-      // debugger
-      ma ? (ma.i++, ma.x = x) : //, ma.y = y
-        res.unshift(ma = { type: "add", x, y, i: 1 });
-      md ? (md.i++, md.x = x - 1, md.y = y) :
-        res.unshift(md = { type: "del", x: x - 1, y, i: 1 });
-    }
-    // if (type === "cross") {
-    //   debugger
-    //   ma.y += md.i - 1;
-    // 
-    // ma ? (ma.i++, ma.x = x) :
-    //   res.unshift(ma = { type: "add", x, y, i: 1 });
-    // md ? (md.i++, md.x = x - 1, md.y = y) :
-    //   res.unshift(md = { type: "del", x: x - 1, y, i: 1 });
-    // }
+    if (md && type === "add" || type === "cross")
+      md.x = x - 1;
 
     if (type != "del") n -= 1;
     if (type != "add") n -= W;
