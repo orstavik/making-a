@@ -73,9 +73,9 @@ export function diffRaw(A, B) {
 }
 
 function secondStep(diffs) {
-  const diffs2 = diffs.map(p =>
+  const diffs2 = diffs.flatMap(p =>
     p.a === p.b || !p.a || !p.b ? p :
-      diffRaw(p.a, p.b)).flat();
+      diffRaw(p.a, p.b));
 
   const diffs3 = [];
   let last = diffs3[0] = diffs2[0];
@@ -91,8 +91,16 @@ function secondStep(diffs) {
   return diffs3;
 }
 
+function thirdStep(diffs) {
+  return diffs.flatMap(p => p.a && p.b && p.a !== p.b ? [{ a: p.a, b: "" }, { a: "", b: p.b }] : p);
+}
+
 export function diff(A, B) {
-  return (A.length * B.length) < 1_000_000 ?
-    diffRaw(A, B) :
-    secondStep(diffRaw(A.split(/\b/), B.split(/\b/)));
+  if ((A.length * B.length) < 1_000_000)
+    return thirdStep(diffRaw(A, B));
+  const Aw = A.split(/\b/), Bw = B.split(/\b/);
+  if ((Aw.length * Bw.length) < 1_000_000)
+    return thirdStep(secondStep(diffRaw(Aw, Bw)));
+  //todo untested..
+  return thirdStep(secondStep(diffRaw(A.split(/(\r?\n)/), B.split(/(\r?\n)/))));
 }
