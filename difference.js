@@ -63,36 +63,34 @@ export function diffRaw(A, B) {
   let p, res = [];
   for (let { a, b } of backtrace(levenshteinMinimalShifts(A, B), A, B))
     p && (p.a === p.b) === (a === b) ?
-      ((p.a = a + p.a), (p.b = b + p.b)) :
+      ((p.a = a.concat(p.a)), (p.b = b.concat(p.b))) :
       res.unshift(p = { a, b });
   if (res.length === 3 && !res[0].b && !res[2].b && res[1].a === res[1].b && res[1].a === res[2].a)
-    return (res[0].a += res[2].a), res.slice(0, 2);
+    return (res[0].a = res[0].a.concat(res[2].a)), res.slice(0, 2);
   if (res.length === 3 && !res[0].a && !res[2].a && res[1].a === res[1].b && res[1].a === res[2].b)
-    return (res[0].b += res[2].b), res.slice(0, 2);
+    return (res[0].b = res[0].b.concat(res[2].b)), res.slice(0, 2);
   return res;
 }
 
 function secondStep(diffs) {
-  const diffs2 = diffs.flatMap(p =>
-    p.a === p.b || !p.a || !p.b ? p :
-      diffRaw(p.a, p.b));
+  const diffs2 = diffs.flatMap(p => p.a === p.b || !p.a || !p.b ? p : diffRaw(p.a, p.b));
 
   const diffs3 = [];
   let last = diffs3[0] = diffs2[0];
   for (let i = 1; i < diffs2.length; i++) {
     const n = diffs2[i];
-    if ((n.a === n.b) === (last.a === last.b)) {
-      last.a += n.a;
-      last.b += n.b;
-    } else {
+    if ((n.a === n.b) === (last.a === last.b))
+      ((last.a = last.a.concat(n.a)), (last.b = last.b.concat(n.b)));
+    else
       diffs3.push(last = n);
-    }
   }
   return diffs3;
 }
 
 function thirdStep(diffs) {
-  return diffs.flatMap(p => p.a && p.b && p.a !== p.b ? [{ a: p.a, b: "" }, { a: "", b: p.b }] : p);
+  const empty = diffs[0]?.a instanceof Array ? Object.freeze([]) : "";
+  return diffs.flatMap(p =>
+    p.a && p.b && p.a !== p.b ? [{ a: p.a, b: empty }, { a: empty, b: p.b }] : p);
 }
 
 export function diff(A, B) {
@@ -103,4 +101,8 @@ export function diff(A, B) {
     return thirdStep(secondStep(diffRaw(Aw, Bw)));
   //todo untested..
   return thirdStep(secondStep(diffRaw(A.split(/(\r?\n)/), B.split(/(\r?\n)/))));
+}
+
+export function diffArray(A, B) {
+  return thirdStep(diffRaw(A, B));
 }
