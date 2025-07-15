@@ -145,13 +145,13 @@ export function backtrace2(table, A, B) {
       mn = undefined;
 
     if (type === "match")
-      mn ? (mn.i++, mn.x = x, mn.y = y) :
+      mn ? (mn.i++, mn.x = x, mn.y = y, mn.n = n) :
         res.unshift(mn = { n, type, x, y, i: 1 });
     if (type === "add" || type === "cross")
-      ma ? (ma.i++, ma.x = x, ma.y = y) :
+      ma ? (ma.i++, ma.x = x, ma.y = y, ma.n = n) :
         res.unshift(ma = { n, type: "add", x, y, i: 1 });
     if (type === "del" || type === "cross")
-      md ? (md.i++, md.x = x, md.y = y) :
+      md ? (md.i++, md.x = x, md.y = y, md.n = n) :
         res.unshift(md = { n, type: "del", x, y, i: 1 });
 
     if (type != "del") n -= 1;
