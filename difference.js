@@ -63,9 +63,11 @@ export function* backtrace(table, A, B) {
 }
 
 export function diffRaw(A, B) {
+  if (!A.length && !B.length) return [];
+  if (!A.length) return [{ type: "add", x: 0, y: 0, i: B.length, a: A, b: B }];
+  if (!B.length) return [{ type: "del", x: 0, y: 0, i: A.length, a: A, b: B }];
+  const res = backtrace2(levenshteinMinimalShifts(A, B), A, B);
   const empty = A instanceof Array || B instanceof Array ? Object.freeze([]) : "";
-
-  const res = diffImpl(A, B);
   for (let d of res) {
     d.aa = d.type === "add" ? empty : A.slice(d.y, d.y + d.i);
     d.bb = d.type === "del" ? empty : B.slice(d.x, d.x + d.i);
@@ -105,9 +107,10 @@ export function diff(A, B) {
 }
 
 
-export function* backtrace2(table, A, B) {
+export function backtrace2(table, A, B) {
   const W = B.length + 1;
   let n = table.length - 1;
+  let res = [], mn, ma, md;
   while (n > 0) {
     const y = Math.floor(n / W) - 1;
     const x = (n % W) - 1;
@@ -137,35 +140,22 @@ export function* backtrace2(table, A, B) {
           type = "cross";
       }
     }
-    if (type == "cross") {
-      yield { type: "add", x, y, i: 1 };
-      yield { type: "del", x, y, i: 1 };
-    } else {
-      yield { type, x, y, i: 1 };
-    }
+    type == "match" ?
+      ma = md = undefined :
+      mn = undefined;
+
+    if (type === "match")
+      mn ? (mn.i++, mn.x = x, mn.y = y) :
+        res.unshift(mn = { n, type, x, y, i: 1 });
+    if (type === "add" || type === "cross")
+      ma ? (ma.i++, ma.x = x, ma.y = y) :
+        res.unshift(ma = { n, type: "add", x, y, i: 1 });
+    if (type === "del" || type === "cross")
+      md ? (md.i++, md.x = x, md.y = y) :
+        res.unshift(md = { n, type: "del", x, y, i: 1 });
+
     if (type != "del") n -= 1;
     if (type != "add") n -= W;
-  }
-}
-
-function diffImpl(A, B) {
-  if (!A.length && !B.length) return [];
-  if (!A.length) return [{ type: "add", x: 0, y: 0, i: B.length }];
-  if (!B.length) return [{ type: "del", x: 0, y: 0, i: A.length }];
-  let res = [], mn, ma, md;
-  for (let n of backtrace2(levenshteinMinimalShifts(A, B), A, B)) {
-    if (!mn && n.type === "match")
-      (ma = md = undefined), res.unshift(mn = n);
-    else if (!ma && n.type === "add")
-      (mn = undefined), res.unshift(ma = n);
-    else if (!md && n.type === "del")
-      (mn = undefined), res.unshift(md = n);
-    else if (n.type === "match")
-      mn.i++, mn.x = n.x, mn.y = n.y;
-    else if (n.type === "add")
-      ma.i++, ma.x = n.x, ma.y = n.y;
-    else if (n.type === "del")
-      md.i++, md.x = n.x, md.y = n.y;
   }
   return res;
 }
