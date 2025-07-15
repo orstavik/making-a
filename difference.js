@@ -51,7 +51,12 @@ export function* backtrace(table, A, B) {
     }
     if (type == "add") a = "";
     if (type == "del") b = "";
-    yield { type, now, n, x, y, a, b };
+    if (type == "cross") {
+      yield { type, now, n, x, y, a, b: "" };
+      yield { type, now, n, x, y, a: "", b };
+    } else {
+      yield { type, now, n, x, y, a, b };
+    }
     if (type != "del") n -= 1;
     if (type != "add") n -= W;
   }
@@ -61,10 +66,10 @@ export function diffRaw(A, B) {
   if (!A.length && !B.length) return [];
   if (!A.length || !B.length) return [{ a: A, b: B }];
   let p, res = [];
-  for (let { a, b } of backtrace(levenshteinMinimalShifts(A, B), A, B))
-    p && (p.a === p.b) === (a === b) ?
-      ((p.a = a.concat(p.a)), (p.b = b.concat(p.b))) :
-      res.unshift(p = { a, b });
+  for (let x of backtrace(levenshteinMinimalShifts(A, B), A, B))
+    p && (p.a === p.b) === (x.a === x.b) ?
+      ((p.a = x.a.concat(p.a)), (p.b = x.b.concat(p.b))) :
+      res.unshift(p = x);
   if (res.length === 3 && !res[0].b && !res[2].b && res[1].a === res[1].b && res[1].a === res[2].a)
     return (res[0].a = res[0].a.concat(res[2].a)), res.slice(0, 2);
   if (res.length === 3 && !res[0].a && !res[2].a && res[1].a === res[1].b && res[1].a === res[2].b)
@@ -106,3 +111,14 @@ export function diff(A, B) {
 export function diffArray(A, B) {
   return thirdStep(diffRaw(A, B));
 }
+
+// const res2 = [...backtrace(levenshteinMinimalShifts(A, B), A, B)]
+// if (res2.length <= 1) return res2;
+// let p2, res3 = [res2[0]];
+// for (let i = 1; i <= res2.length; i++) {
+//   const x = res2[i];
+//   (p.a === p.b) === (x.a === x.b) ?
+//     ((p.a = x.a.concat(p.a)), (p.b = x.b.concat(p.b))) : //todo here i need to make it both as an array and as a string
+//     res.unshift(p = x);
+// }
+// debugger
