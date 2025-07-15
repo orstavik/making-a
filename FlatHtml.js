@@ -1,4 +1,4 @@
-import { diffArray } from "./difference.js";
+import { diff } from "./difference.js";
 
 const START_TAG_HEAD_A = /<[a-z][a-z0-9-]*/ig;
 const AT_BODY = /\s+([a-z_][a-z0-9.:_-]*)(?:\s*=\s*(?:"((?:\\.|[^"])*)"|'((?:\\.|[^'])*)'|([^>\s]+)))?/ig;
@@ -6,12 +6,12 @@ const START_TAG_HEAD_Z = /\/?>/ig;
 const HTML_END_TAG = /<\/[a-z][a-z0-9-]*\s*>/ig;
 const HTML_COMMENT = /<!--[\s\S]*?-->/ig;
 const HTML_DOCTYPE = /<!doctype\s[^>]*>/ig;
-const HTML_TEXT = /(?:[^<]|<(?![a-z\/!]))/ig;
+const HTML_TEXT = /(?:[^<]|<(?![a-z\/!]))+/ig;
 
 const token_re = new RegExp(
   "(?:" +
   "(" + START_TAG_HEAD_A.source + ")" +
-  "((" + AT_BODY.source + ")*)?" + "\\s*" +
+  "((?:" + AT_BODY.source + ")*)?" + "\\s*" +
   "(" + START_TAG_HEAD_Z.source + ")" +
   ")" +
   "|(" + HTML_END_TAG.source + ")" +
@@ -30,6 +30,8 @@ function parseStartTagBody(body) {
     parts.push(" "), types.push(' ');
     let first = true;
     for (let seg of n.split(':')) {
+      if (!seg) continue;
+      if (!first) parts.push(":"), types.push(":");
       const i = seg.search(/[-_.]/);
       const type = !first ? "r" : ((first = false), "p");
       if (i === -1)
@@ -117,25 +119,10 @@ export class FlatHtml {
 
 export class FlatHtmlDiff {
 
-  static MATCH = "match";
-  static INSERT = "insert";
-  static DELETE = "delete";
-
   #a;
   #b;
+  #diffs;
   #list;
-
-  #makeList(A, B) {
-    let Ai = 0, Bi = 0;
-    const res = diffArray(A.words, B.words);
-    return res.flatMap(({ a, b }) =>
-      a && b ?
-        ((Ai += A.length), b.map(word => ({ word, type: B.types[Bi++], action: "match" }))) :
-        b ?
-          b.map(word => ({ word, type: B.types[Bi++], action: "insert" })) :
-          a.map(word => ({ word, type: A.types[Ai++], action: "delete" }))
-    );
-  }
 
   constructor(A, B) {
     if (typeof A === 'string') A = new FlatHtml(A);
@@ -144,16 +131,27 @@ export class FlatHtmlDiff {
       throw new TypeError("Both arguments must be string or FlatHtml.");
     this.#a = A;
     this.#b = B;
-    this.#list = this.#makeList(A, B);
+    this.#diffs = diff(A.words, B.words);
+    const empty = Object.freeze([]);
+    for (let d of this.#diffs) {
+      d.at = d.type === "add" ? empty : A.types.slice(d.y, d.y + d.i);
+      d.bt = d.type === "del" ? empty : B.types.slice(d.x, d.x + d.i);
+    }
+    this.#list = this.#diffs.flatMap(
+      ({ type, a: A, b: B, at: AT, bt: BT }) =>
+        type == "match" ? A.map((a, i) => ({ type, a, at: AT[i], b: B[i], bt: BT[i] })) :
+          type == "del" ? A.map((a, i) => ({ type, a, at: AT[i], b: null, bt: null })) :
+            B.map((b, i) => ({ type, a: null, at: null, b, bt: BT[i] }))
+    );
   }
   get a() { return this.#a; }
   get b() { return this.#b; }
 
   get all() { return this.#list; }
-  get matches() { return this.#list.filter(({ action }) => action === "match"); }
-  get inserts() { return this.#list.filter(({ action }) => action === "insert"); }
-  get deletes() { return this.#list.filter(({ action }) => action === "delete"); }
-  get aSide() { return this.#list.filter(({ action }) => action !== "insert"); }
-  get bSide() { return this.#list.filter(({ action }) => action !== "delete"); }
-  get changes() { return this.#list.filter(({ action }) => action !== "match"); }
+  get aSide() { return this.#list.filter(({ a }) => a); } //type !== "add"
+  get bSide() { return this.#list.filter(({ b }) => b); }// type !== "del"
+  get changed() { return this.#list.filter(({ type }) => type !== "match"); }
+  get unchanged() { return this.#list.filter(({ type }) => type === "match"); }
+  get added() { return this.#list.filter(({ type }) => type === "add"); }
+  get removed() { return this.#list.filter(({ type }) => type === "del"); }
 }
