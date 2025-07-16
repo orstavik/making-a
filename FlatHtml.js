@@ -69,7 +69,7 @@ function parseHTML(str) {
         const [bodyParts, bodyTypes] = parseStartTagBody(body || '');
         words.push(...bodyParts), types.push(...bodyTypes);
       }
-      words.push(tail), types.push(tail == ">" ? ">" : "/");
+      words.push(tail), types.push(">");
     } else if (endTag)
       words.push(endTag), types.push('b');
     else if (comment)
@@ -98,7 +98,6 @@ export class FlatHtml {
   static ATTR_QUOTE = '"';
   static SPACE = " ";
   static TAG_START_END = ">";
-  static TAG_START_END_SELF_CLOSING = "/";
 
   #words;
   #types;

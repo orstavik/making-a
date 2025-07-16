@@ -12,6 +12,7 @@ export default [
               <li>episode #{{#episode}}: {{episode}} produced by {{producer}}.</li>
             </template>
           </ol>
+          <img src="https://example.com/image.jpg" alt="An example image" class="example-image"/>
  `,
   `
 <ol class="$short normal $other $bob" 
@@ -26,8 +27,9 @@ export default [
               <li>episode #{{#episode}}: {{episode}} produced by {{producer}}.</li>
             </template>
           </ol>
+          <img src="https://example.com/image.jpg" alt="An example image" class="example-image"/>
  `,
-  [[67, 67]],
-  67,
-  `ta p="$ . $ $" pq:rq>ta p:r pq:rq p="$ . . $">tbta p="v">ta>tbtbtbt`
+  [[88, 88]],
+  88,
+  `ta p="$ . $ $" pq:rq>ta p:r pq:rq p="$ . . $">tbta p="v">ta>tbtbtbta p="v" p="v" p=".">t`
 ];
