@@ -105,7 +105,7 @@ export class FlatHtml {
 
   constructor(words, types) {
     if (typeof words === 'string')
-      ({ one: words, two: types } = parseHTML(words));
+      ({ words, types } = parseHTML(words));
     this.#words = words.slice();
     this.#types = types.slice();
   }
