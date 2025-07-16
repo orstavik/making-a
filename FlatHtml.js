@@ -147,6 +147,7 @@ export class FlatHtmlDiff {
   get a() { return this.#a; }
   get b() { return this.#b; }
 
+  get diffs() { return this.#diffs; }
   get all() { return this.#list; }
   get aSide() { return this.#list.filter(({ a }) => a); } //type !== "add"
   get bSide() { return this.#list.filter(({ b }) => b); }// type !== "del"

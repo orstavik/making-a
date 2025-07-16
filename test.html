@@ -51,16 +51,25 @@
     background-color: plum;
   }
 
-  div.mono>div.cross {
-    background-color: chocolate;
-  }
-
   div.mono>div.match {
     background-color: lime;
   }
 
-  div.mono>div.end {
-    background-color: grey;
+  div.actions>div {
+    border-left: 2px solid red;
+  }
+
+  div.actions span.divider {
+    display: inline-block;
+    border: 2px dotted orange;
+  }
+
+  div.actions>.equal {
+    border-left: 2px solid lime;
+  }
+
+  div.actions>:not(.match).equal {
+    border-left: 2px solid blue;
   }
 
   div.success {
@@ -75,11 +84,21 @@
 
 <script type="module">
   import { diffRaw, diff, backtrace, levenshteinMinimalShifts } from "./difference.js";
+  import { FlatHtmlDiff } from "./FlatHtml.js";
+  import test1 from "./tests/test1.js";
+  import test2 from "./tests/test2.js";
+  import test3 from "./tests/test3.js";
+
+  function recalculateLeveN({ type, x, y }, i, W) {
+    const n2 = ++y * W + ++x;
+    return n2 + (type !== "del" ? i : 0) + (type != "add" ? i * W : 0);
+  }
 
   function tableWithTrace(table, bt, A, B) {
     const res = Array.from(table).map(n => ({ num: `${n >> 16}.${n & 0xFFFF}` }));
     for (let p of bt)
-      Object.assign(res[p.n], p);
+      for (let i = 0; i < p.i; i++)
+        Object.assign(res[recalculateLeveN(p, i, B.length + 1)], p);
     if (typeof A === "string") A = A.split("");
     if (typeof B === "string") B = B.split("");
     A = [" ", " ", ...A];
@@ -90,17 +109,9 @@
     return res;
   }
 
-  function test(A, B) {
-    const table = levenshteinMinimalShifts(A, B);
-    const trace = [...backtrace(table, A, B)];
-    const n = performance.now();
-    const actions = diff(A, B);
-    const duration = performance.now() - n;
-    return { table, trace, actions, duration };
-  }
-
-
   function levenToHTML(rows, bt, A, B) {
+    if (!rows || !bt || A.length * B.length > 500)
+      return "";
     const table = tableWithTrace(rows, bt, A, B);
     return `<div class="mono" style="grid-template-columns: repeat(${B.length + 2}, max-content);">
       ${table.map(({ num, type = "", a = "", b = "" }) =>
@@ -108,29 +119,59 @@
       </div>`;
   }
 
-  function actionsToHTML(actions) {
-    return `<div class="actions">
-      ${actions.map(({ a, b }) => `<div>${a == b ? "=" : !a ? "+" : !b ? "-" : "*"}  ${a.replaceAll("<", "&lt;")} / ${b.replaceAll("<", "&lt;")}</div>`).join("\n")}
-    </div>`;
+  function* iterateMatchDiff(arr) {
+    for (let i = 0; i < arr.length; i++) {
+      let one = arr[i], two = arr[i + 1];
+      if (one.type === "add" && two?.type === "del")
+        two = arr[i], one = arr[i + 1];
+      yield one.type === "del" && two?.type === "add" ?
+        (i++, { a: one.a, b: two.b, type: "diff" }) :
+        one;
+    }
+  }
+
+  function visualizeHtmlText(text) {
+    return text
+      .replaceAll("<", "&lt;")
+      .replace(/ /g, '⬜️')        // Space
+      .replace(/\t/g, '↹')        // Tab
+      .replace(/\n/g, '⏎\n')      // Newline (preserve layout)
+      .replace(/\r/g, '⮐')        // Carriage return
+      .replace(/\u00A0/g, '🔒')   // Non-breaking space
+      .replace(/\u200B/g, '🕳️');  // Zero-width space
+  }
+
+  function actionsView(diffs) {
+    let res = "";
+    for (let { type, a, b } of iterateMatchDiff(diffs)) {
+      if (a.join) a = a.join("");
+      if (b.join) b = b.join("");
+      const equal = a.trim() == b.trim() ? "equal" : "";
+      const txt = type === "match" ? visualizeHtmlText(a) :
+        visualizeHtmlText(a) + "<span class='divider'>/</span>" + visualizeHtmlText(b);
+      res += `<div class="${type} ${equal}">${txt}</div>\n`;
+    }
+    return `<div class="actions">\n${res}</div>`;
   }
 
   const tests = [
-    ["aby", "abx", [[2, 2], [1, 0], [0, 1]]],
+    [".ab.", "_ab_a_b_", [[1, 0], [0, 1], [2, 2], [1, 0], [0, 5]]],
+    ["aa", "bb", [[2, 0], [0, 2]]],
+    ["a", "b", [[1, 0], [0, 1]]],
+    ["abc", "def", [[3, 0], [0, 3]]],
     ["a", "baa", [[0, 2], [1, 1]]],
     ["baa", "a", [[2, 0], [1, 1]]],
     ["baaaa", "aa", [[3, 0], [2, 2]]],
+    ["aby", "abx", [[2, 2], [1, 0], [0, 1]]],
     ["ab", "ab_a_bxx", [[2, 2], [0, 6]]],
     ["ab", "a_b_abxx", [[0, 4], [2, 2], [0, 2]]],
     ["ab_a_bx", "ab", [[2, 2], [5, 0]]],
     ["a_b_abx", "ab", [[4, 0], [2, 2], [1, 0]]],
     ["xxa_b_abx", "ab", [[6, 0], [2, 2], [1, 0]]],
     ["ab", "ab_a_b", [[2, 2], [0, 4]]],
-    [".ab.", "_ab_a_b_", [[1, 0], [0, 1], [2, 2], [1, 0], [0, 5]]],
     ["abc", "ababcbc", [[0, 2], [3, 3], [0, 2]]],
     ["abcbc", "abc", [[3, 3], [2, 0]]],
-    ["a", "b", [[1, 0], [0, 1]]],
     ["kitten", "sitting", [[1, 0], [0, 1], [3, 3], [1, 0], [0, 1], [1, 1], [0, 1]]],
-    ["abc", "def", [[3, 0], [0, 3]]],
     ["abc", "abc", [[3, 3]]],
     ["a_b_cabc_ab_c", "abc", [[5, 0], [3, 3], [5, 0]]],
     ["", "", []],
@@ -145,32 +186,44 @@
     ["Hello, world!", "Hello world", [[5, 5], [1, 0], [6, 6], [1, 0]]]
   ];
 
-  function runTest(A, B, res) {
-    const { table, trace, actions, duration } = test(A, B);
+  function printTest(res, duration, A, B, actions, table, trace) {
     const quickcheck = actions.map(({ a, b }) => [a.length, b.length]);
     const noMatch = quickcheck.findIndex((actual, i) => JSON.stringify(actual) !== JSON.stringify(res[i]));
     const wsOnly = actions.every(({ a, b }, i) => a == b || !(a + b).trim());
     const Ax = A.substr(0, 25).replaceAll("\n", "⏎");
     const Bx = B.substr(0, 25).replaceAll("\n", "⏎");
-
-    document.body.querySelector("div").insertAdjacentHTML("beforeend", `
-<div class="${noMatch >= 0 ? "error" : "success"}">
-  <div class="clock">${duration.toFixed(1)}🕓${Ax} ⚔️ ${Bx}</div>
-  ${actionsToHTML(actions)}
-  ${((A.length * B.length < 500) ? levenToHTML(table, trace, A, B) : "")}
-</div>`);
-
+    document.body.querySelector("div").insertAdjacentHTML("beforeend", `<div class="${noMatch >= 0 ? "error" : "success"}">
+      <div class="clock">${duration.toFixed(1)}🕓${Ax} ⚔️ ${Bx}</div>
+        ${actionsView(actions)}
+        ${levenToHTML(table, trace, A, B)}
+      </div>`);
     noMatch >= 0 ?
       console.error(
         `❌${wsOnly ? `👻` : ""} ${duration.toFixed(1)}🕓 ${Ax} ⚔️ ${Bx}\n`,
         `didn't expect this action #${noMatch}: ${JSON.stringify(actions[noMatch])}`) :
       console.log(`✅${wsOnly ? `👻` : ""} ${duration.toFixed(1)}🕓 ${Ax} ⚔️ ${Bx}`);
+  }
 
+  function runTest(A, B, res) {
+    const table = levenshteinMinimalShifts(A, B);
+    const trace = backtrace(table, A, B);
+    const start = performance.now();
+    const actions = diff(A, B);
+    const duration = performance.now() - start;
+    printTest(res, duration, A, B, actions, table, trace);
+  }
+
+  function runHTMLtest(A, B, res) {
+    const start = performance.now();
+    const diff = new FlatHtmlDiff(A, B);
+    const duration = performance.now() - start;
+    printTest(res, duration, A, B, diff.diffs);
   }
 
   for (let [A, B, res] of tests)
     runTest(A, B, res);
-  runTest(...(await import("./tests/test1.js")).default)
-  runTest(...(await import("./tests/test2.js")).default)
-  runTest(...(await import("./tests/test3.js")).default)
+
+  runHTMLtest(...test1);
+  runHTMLtest(...test2);
+  runHTMLtest(...test3);
 </script>
