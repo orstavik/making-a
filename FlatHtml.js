@@ -102,19 +102,26 @@ export class FlatHtml {
 
   #words;
   #types;
-  #list;
-  constructor(str) {
-    const { words, types } = parseHTML(str);
-    this.#words = words;
-    this.#types = types;
-    this.#list = [];
-    for (let i = 0; i < words.length; i++)
-      this.#list.push({ word: words[i], type: types[i] });
+
+  constructor(words, types) {
+    if (typeof words === 'string')
+      ({ one: words, two: types } = parseHTML(words));
+    this.#words = words.slice();
+    this.#types = types.slice();
+  }
+  update(...indexWordTypes) {
+    const words = this.#words.slice();
+    const types = this.#types.slice();
+    for (let { index, word, type } of indexWordTypes) {
+      words[index] = word;
+      types[index] = type;
+    }
+    return new FlatHtml(words, types);
   }
   get words() { return this.#words; }
   get types() { return this.#types; }
   toString() { return this.#words.join(''); }
-  get list() { return this.#list; }
+  get list() { return words.map((word, index) => ({ index, word, type: types[index] })); }
 }
 
 export class FlatHtmlDiff {
@@ -131,7 +138,9 @@ export class FlatHtmlDiff {
       throw new TypeError("Both arguments must be string or FlatHtml.");
     this.#a = A;
     this.#b = B;
+    //remove the syntactic characters
     this.#diffs = diff(A.words, B.words);
+    //add the syntactic characters again?
     const empty = Object.freeze([]);
     for (let d of this.#diffs) {
       d.at = d.type === "add" ? empty : A.types.slice(d.y, d.y + d.i);
