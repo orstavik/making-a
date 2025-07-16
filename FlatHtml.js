@@ -121,7 +121,7 @@ export class FlatHtml {
   get words() { return this.#words; }
   get types() { return this.#types; }
   toString() { return this.#words.join(''); }
-  get list() { return words.map((word, index) => ({ index, word, type: types[index] })); }
+  get list() { return this.#words.map((word, index) => ({ index, word, type: types[index] })); }
 }
 
 export class FlatHtmlDiff {
