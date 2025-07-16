@@ -119,7 +119,26 @@ export class FlatHtml {
     }
     return new FlatHtml(words, types);
   }
-  //todo we also need insert and delete..
+
+  insert(...indexWordTypes){
+    const words = this.#words.slice();
+    const types = this.#types.slice();
+    for (let { index, word, type } of indexWordTypes) {
+      words.splice(index, 0, word);
+      types.splice(index, 0, type);
+    }
+    return new FlatHtml(words, types);
+  }
+
+  delete(...indexWordTypes){
+    const words = this.#words.slice();
+    const types = this.#types.slice();
+    for (let { index } of indexWordTypes) {
+      words.splice(index, 1);
+      types.splice(index, 1);
+    }
+    return new FlatHtml(words, types);
+  }
 
   get words() { return this.#words; }
   get types() { return this.#types; }
