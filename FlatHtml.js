@@ -90,7 +90,7 @@ export class FlatHtml {
   static TEXT = "t";
   static TRIGGER = "p";
   static REACTION = "r";
-  static TRIGGER_REACTION_QUALIFIER = "q";
+  static QUALIFIER = "q";
   static CSS = ".";
   static CSSS = "$";
   static ATTR_VALUE = "v";
@@ -109,6 +109,7 @@ export class FlatHtml {
     this.#words = words.slice();
     this.#types = types.slice();
   }
+
   update(...indexWordTypes) {
     const words = this.#words.slice();
     const types = this.#types.slice();
@@ -118,10 +119,12 @@ export class FlatHtml {
     }
     return new FlatHtml(words, types);
   }
+  //todo we also need insert and delete..
+
   get words() { return this.#words; }
   get types() { return this.#types; }
   toString() { return this.#words.join(''); }
-  get list() { return this.#words.map((word, index) => ({ index, word, type: types[index] })); }
+  get list() { return this.#words.map((word, index) => ({ index, word, type: this.#types[index] })); }
 }
 
 export class FlatHtmlDiff {
