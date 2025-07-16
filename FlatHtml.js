@@ -26,7 +26,7 @@ function parseStartTagBody(body) {
   const types = [];
   for (let m; (m = AT_BODY.exec(body)) !== null;) {
     const [, n, dQuote, sQuote, noQuote,] = m;
-    const v = (dQuote ?? sQuote ?? noQuote).replace(/\\.|"/g, m => m[1] == "'" ? "'" : m[1] ? m : '\\"');
+    const v = (dQuote ?? sQuote ?? noQuote)?.replace(/\\.|"/g, m => m[1] == "'" ? "'" : m[1] ? m : '\\"');
     parts.push(" "), types.push(' ');
     let first = true;
     for (let seg of n.split(':')) {
@@ -42,7 +42,7 @@ function parseStartTagBody(body) {
     if (v) {
       parts.push("=", '"'), types.push("=", '"');
       if (n === "class" && v?.trim()) {
-        const classes = v.trim().replaceAll(/\s+/, " ").split(/(\s)/);
+        const classes = v.trim().replaceAll(/\s+/g, " ").split(/(\s)/g);
         parts.push(...classes), types.push(...classes.map(([c]) => c == '$' ? "$" : c == " " ? " " : '.'));
       } else
         parts.push(v), types.push('v');

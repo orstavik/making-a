@@ -84,10 +84,11 @@
 
 <script type="module">
   import { diffRaw, diff, backtrace, levenshteinMinimalShifts } from "./difference.js";
-  import { FlatHtmlDiff } from "./FlatHtml.js";
+  import { FlatHtml, FlatHtmlDiff } from "./FlatHtml.js";
   import test1 from "./tests/test1.js";
   import test2 from "./tests/test2.js";
   import test3 from "./tests/test3.js";
+  import test4 from "./tests/test4.js";
 
   function recalculateLeveN({ type, x, y }, i, W) {
     const n2 = ++y * W + ++x;
@@ -132,7 +133,7 @@
 
   function visualizeHtmlText(text) {
     return text
-      .replaceAll("<", "&lt;")
+      .replaceAll("<", "≲")
       .replace(/ /g, '⬜️')        // Space
       .replace(/\t/g, '↹')        // Tab
       .replace(/\n/g, '⏎\n')      // Newline (preserve layout)
@@ -213,11 +214,16 @@
     printTest(res, duration, A, B, actions, table, trace);
   }
 
-  function runHTMLtest(A, B, res) {
+  function runHTMLtest(A, B, res, aCount, aTypes) {
     const start = performance.now();
     const diff = new FlatHtmlDiff(A, B);
     const duration = performance.now() - start;
     printTest(res, duration, A, B, diff.diffs);
+    let { types, words } = new FlatHtml(A);
+    types = types.join("");
+    types == aTypes && words.length == aCount ?
+      console.log(`✅📄html`) :
+      console.error(`❌📄html\ncount expected/actual: ${aCount}/${words.length}\ntype expected/actual\n${aTypes}\n${types}`);
   }
 
   for (let [A, B, res] of tests)
@@ -226,4 +232,5 @@
   runHTMLtest(...test1);
   runHTMLtest(...test2);
   runHTMLtest(...test3);
+  runHTMLtest(...test4);
 </script>
