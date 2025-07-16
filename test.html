@@ -190,8 +190,8 @@
     const quickcheck = actions.map(({ a, b }) => [a.length, b.length]);
     const noMatch = quickcheck.findIndex((actual, i) => JSON.stringify(actual) !== JSON.stringify(res[i]));
     const wsOnly = actions.every(({ a, b }, i) => a == b || !(a + b).trim());
-    const Ax = A.substr(0, 25).replaceAll("\n", "⏎");
-    const Bx = B.substr(0, 25).replaceAll("\n", "⏎");
+    const Ax = visualizeHtmlText(A.substr(0, 25));
+    const Bx = visualizeHtmlText(B.substr(0, 25));
     document.body.querySelector("div").insertAdjacentHTML("beforeend", `<div class="${noMatch >= 0 ? "error" : "success"}">
       <div class="clock">${duration.toFixed(1)}🕓${Ax} ⚔️ ${Bx}</div>
         ${actionsView(actions)}
