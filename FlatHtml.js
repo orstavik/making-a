@@ -1,188 +1,151 @@
-import { diff } from "./difference.js";
+import { diffRaw } from "./difference.js";
 
-const START_TAG_HEAD_A = /<[a-z][a-z0-9-]*/ig;
+const START_TAG_HEAD_A = /<([a-z][a-z0-9-]*)/ig;
 const AT_BODY = /\s+([a-z_][a-z0-9.:_-]*)(?:\s*=\s*(?:"((?:\\.|[^"])*)"|'((?:\\.|[^'])*)'|([^>\s]+)))?/ig;
-const START_TAG_HEAD_Z = /\/?>/ig;
-const HTML_END_TAG = /<\/[a-z][a-z0-9-]*\s*>/ig;
-const HTML_COMMENT = /<!--[\s\S]*?-->/ig;
-const HTML_DOCTYPE = /<!doctype\s[^>]*>/ig;
-const HTML_TEXT = /(?:[^<]|<(?![a-z\/!]))+/ig;
+const START_TAG_HEAD_Z = /\s*\/?>/ig;
+const HTML_END_TAG = /<\/([a-z][a-z0-9-]*)\s*>/ig;
+const HTML_COMMENT = /<!--(.*?)-->/ig;
+const HTML_DOCTYPE = /<!doctype\s([^>]*)>/ig;
+const HTML_TEXT = /((?:[^<]|<(?![a-z\/!]))+)/ig;
 
 const token_re = new RegExp(
   "(?:" +
-  "(" + START_TAG_HEAD_A.source + ")" +
-  "((?:" + AT_BODY.source + ")*)?" + "\\s*" +
-  "(" + START_TAG_HEAD_Z.source + ")" +
+  START_TAG_HEAD_A.source +
+  "((?:" + AT_BODY.source + ")*)?" +
+  START_TAG_HEAD_Z.source +
   ")" +
-  "|(" + HTML_END_TAG.source + ")" +
-  "|(" + HTML_COMMENT.source + ")" +
-  "|(" + HTML_DOCTYPE.source + ")" +
-  "|(" + HTML_TEXT.source + ")",
+  "|" + HTML_END_TAG.source +
+  "|" + HTML_COMMENT.source +
+  "|" + HTML_DOCTYPE.source +
+  "|" + HTML_TEXT.source,
   "ig"
 );
 
-function parseStartTagBody(body) {
-  const parts = [];
-  const types = [];
-  for (let m; (m = AT_BODY.exec(body)) !== null;) {
-    const [, n, dQuote, sQuote, noQuote,] = m;
-    const v = (dQuote ?? sQuote ?? noQuote)?.replace(/\\.|"/g, m => m[1] == "'" ? "'" : m[1] ? m : '\\"');
-    parts.push(" "), types.push(' ');
-    let first = true;
-    for (let seg of n.split(':')) {
-      if (!seg) continue;
-      if (!first) parts.push(":"), types.push(":");
-      const i = seg.search(/[-_.]/);
-      const type = !first ? "r" : ((first = false), "p");
-      if (i === -1)
-        parts.push(seg), types.push(type);
-      else
-        parts.push(seg.slice(0, i), seg.slice(i)), types.push(type, 'q');
-    }
-    if (v) {
-      parts.push("=", '"'), types.push("=", '"');
-      if (n === "class" && v?.trim()) {
-        const classes = v.trim().replaceAll(/\s+/g, " ").split(/(\s)/g);
-        parts.push(...classes), types.push(...classes.map(([c]) => c == '$' ? "$" : c == " " ? " " : '.'));
-      } else
-        parts.push(v), types.push('v');
-      parts.push('"'), types.push('"');
-    }
-  }
-  return [parts, types];
-}
-
 function parseHTML(str) {
-  const words = [];
-  const types = [];
+  const res = [];
 
   let m;
   while ((m = token_re.exec(str)) !== null) {
     const [,
-      head, body, _1, _2, _3, _4, tail,
+      head, body, _1, _2, _3, _4,
       endTag, comment, doctype, text
     ] = m;
 
     if (head) {
-      words.push(head), types.push('a');
+      res.push('A' + head);
       if (body) {
-        const [bodyParts, bodyTypes] = parseStartTagBody(body || '');
-        words.push(...bodyParts), types.push(...bodyTypes);
+        for (let m; (m = AT_BODY.exec(body)) !== null;) {
+          const [, n, dQuote, sQuote, noQuote,] = m;
+          n.split(':').forEach((tr, i) => res.push((i ? 'r' : 't') + tr));
+          const v = (dQuote ?? sQuote ?? noQuote)?.replace(/\\.|"/g, m => m[1] == "'" ? "'" : m[1] ? m : '\\"');
+          if (!v) continue;
+          if (n == "class" && v?.trim())
+            v.trim().split(/\s+/g).forEach(c => res.push("c" + c));
+          else if (v)
+            res.push('v' + v);
+        }
       }
-      words.push(tail), types.push(">");
     } else if (endTag)
-      words.push(endTag), types.push('b');
+      res.push('B' + endTag);
     else if (comment)
-      words.push(comment), types.push('c');
+      res.push('C' + comment);
     else if (doctype)
-      words.push(doctype), types.push('d');
+      res.push('D' + doctype);
     else if (text)
-      words.push(text), types.push('t');
+      res.push('T' + text);
   }
-  return { words, types };
+  return res;
+}
+
+function toString(atWords) {
+  function wrap(atw) {
+    let t = atw[1], w = atw.slice(2);
+    const BEFORE = {
+      "A": "<",
+      "B": "</",
+      "C": "<!--",
+      "D": "<!doctype ",
+    };
+    const AFTER = {
+      "B": ">",
+      "C": "-->",
+      "D": ">",
+    };
+    if (t in BEFORE) w = BEFORE[t] + w;
+    if (t in AFTER) w += AFTER[t];
+    return w;
+  }
+
+  const BETWEENS = {
+    "At": " ",
+    "tr": ":",
+    "rr": ":",
+    "tv": '="',
+    "rv": '="',
+    "tc": '="',
+    "rc": '="',
+    "cc": " ",
+    "vt": '" ',
+    "ct": '" ',
+  };
+  const POSTS = {
+    "A": ">",
+    "v": '">',
+    "c": '">',
+    "t": '>',
+    "r": '>',
+  };
+
+  let txt = wrap(atWords[0]);
+  for (let i = 1; i < atWords.length; i++) {
+    const prevType = atWords[i - 1][1];
+    const type = atWords[i][1];
+    const between = BETWEENS[prevType + type] ?? POSTS[prevType] ?? "";
+    txt += between + wrap(atWords[i]);
+  }
+  return txt + POSTS[atWords.at(-1)[1]] ?? "";
 }
 
 export class FlatHtml {
-  static TAG_START = "a";
-  static TAG_END = "b";
-  static COMMENT = "c";
-  static DOCTYPE = "d";
-  static TEXT = "t";
-  static TRIGGER = "p";
+  static TAG_START = "A";
+  static TAG_END = "B";
+  static COMMENT = "C";
+  static DOCTYPE = "D";
+  static TEXT = "T";
+  static TRIGGER = "t";
   static REACTION = "r";
-  static QUALIFIER = "q";
-  static CSS = ".";
-  static CSSS = "$";
+  static CLASS = "c";
   static ATTR_VALUE = "v";
-  static ATTR_EQUAL = "=";
-  static ATTR_QUOTE = '"';
-  static SPACE = " ";
-  static TAG_START_END = ">";
 
-  #words;
-  #types;
+  #atw;
 
-  constructor(words, types) {
-    if (typeof words === 'string')
-      ({ words, types } = parseHTML(words));
-    this.#words = words.slice();
-    this.#types = types.slice();
+  constructor(atw) { this.#atw = Object.freeze(atw); }
+  atw() { return this.#atw; }
+  side(p = 1) { return new FlatHtml(this.#atw.filter(([a]) => !+a || a == p)); }
+  toString() { return toString(this.#atw); }
+  toArray() {
+    return this.#atw.map((atw, index) => ({ index, action: atw[0], type: atw[1], word: atw.slice(2) }));
   }
 
-  update(...indexWordTypes) {
-    const words = this.#words.slice();
-    const types = this.#types.slice();
-    for (let { index, word, type } of indexWordTypes) {
-      words[index] = word;
-      types[index] = type;
-    }
-    return new FlatHtml(words, types);
-  }
+  reset() { return new FlatHtml(this.#atw.map(atw => "0" + atw.slice(1))); }
 
-  insert(...indexWordTypes){
-    const words = this.#words.slice();
-    const types = this.#types.slice();
-    for (let { index, word, type } of indexWordTypes) {
-      words.splice(index, 0, word);
-      types.splice(index, 0, type);
-    }
-    return new FlatHtml(words, types);
-  }
-
-  delete(...indexWordTypes){
-    const words = this.#words.slice();
-    const types = this.#types.slice();
-    for (let { index } of indexWordTypes) {
-      words.splice(index, 1);
-      types.splice(index, 1);
-    }
-    return new FlatHtml(words, types);
-  }
-
-  get words() { return this.#words; }
-  get types() { return this.#types; }
-  toString() { return this.#words.join(''); }
-  get list() { return this.#words.map((word, index) => ({ index, word, type: this.#types[index] })); }
-}
-
-export class FlatHtmlDiff {
-
-  #a;
-  #b;
-  #diffs;
-  #list;
-
-  constructor(A, B) {
-    if (typeof A === 'string') A = new FlatHtml(A);
-    if (typeof B === 'string') B = new FlatHtml(B);
-    if (!(A instanceof FlatHtml) || !(B instanceof FlatHtml))
-      throw new TypeError("Both arguments must be string or FlatHtml.");
-    this.#a = A;
-    this.#b = B;
-    //remove the syntactic characters
-    this.#diffs = diff(A.words, B.words);
-    //add the syntactic characters again?
-    const empty = Object.freeze([]);
-    for (let d of this.#diffs) {
-      d.at = d.type === "add" ? empty : A.types.slice(d.y, d.y + d.i);
-      d.bt = d.type === "del" ? empty : B.types.slice(d.x, d.x + d.i);
-    }
-    this.#list = this.#diffs.flatMap(
-      ({ type, a: A, b: B, at: AT, bt: BT }) =>
-        type == "match" ? A.map((a, i) => ({ type, a, at: AT[i], b: B[i], bt: BT[i] })) :
-          type == "del" ? A.map((a, i) => ({ type, a, at: AT[i], b: null, bt: null })) :
-            B.map((b, i) => ({ type, a: null, at: null, b, bt: BT[i] }))
+  diff(B) {
+    if (typeof B === 'string') B = FlatHtml.fromString(B);
+    if (!(B instanceof FlatHtml))
+      throw new TypeError("Argument must be string or FlatHtml.");
+    const raws = diffRaw(this.#atw, B.#atw);
+    const diffs = raws.flatMap(({ type: action, a, b }) =>
+      action == "add" ? b.map(b => "2" + b.slice(1)) :
+        action == "del" ? a.map(a => "1" + a.slice(1)) :
+          a.map(a => "0" + a.slice(1))
     );
+    return new FlatHtml(diffs);
   }
-  get a() { return this.#a; }
-  get b() { return this.#b; }
 
-  get diffs() { return this.#diffs; }
-  get all() { return this.#list; }
-  get aSide() { return this.#list.filter(({ a }) => a); } //type !== "add"
-  get bSide() { return this.#list.filter(({ b }) => b); }// type !== "del"
-  get changed() { return this.#list.filter(({ type }) => type !== "match"); }
-  get unchanged() { return this.#list.filter(({ type }) => type === "match"); }
-  get added() { return this.#list.filter(({ type }) => type === "add"); }
-  get removed() { return this.#list.filter(({ type }) => type === "del"); }
+  static fromArray(arr) {
+    return new FlatHtml(arr.map(({ action, type, word }) => "" + action + type + word));
+  }
+  static fromString(str) {
+    return new FlatHtml(parseHTML(str).map(tWord => "0" + tWord));
+  }
 }
