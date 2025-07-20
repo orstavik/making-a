@@ -1,0 +1,49 @@
+<style></style>
+<script type="module">
+  import { FlatHtml } from "../FlatHtml.js";
+  import { SheetWrapper } from "https://cdn.jsdelivr.net/gh/orstavik/csss@25.06.05/src/engine.js";
+
+  const CSSS = new SheetWrapper(document.querySelector("style").sheet);
+
+  const one =
+    `<ol class="$short normal $other" 
+    portal-something:reaction_alice 
+>`;
+  const two =
+    `<ol class="$short normal $bob normal2" 
+    portal-something:reaction_bob 
+>`;
+
+  const flat1 = FlatHtml.fromString(one);
+  const flat = flat1.diff(two);
+  const raw = flat.atw();
+  const list = flat.toArray();
+  console.log("we don't use the raw content: ", raw);
+  console.log("the array version we can manipulate manually: ", list);
+
+  const addedClasses = list.filter(({ action, type }) => action == 2 && type == "c").map(({ word }) => word);
+  const addedShorts = addedClasses.filter(word => word.indexOf("$") >= 0);
+  const addedShortsThatFail = addedShorts.filter(word => !CSSS.addRule(word, document.body));
+  console.log("added classes:", addedClasses);
+  console.log("added shorts:", addedShorts);
+  console.log("added shorts that fail:", addedShortsThatFail);
+
+  const shortFixes = {};
+  let flatX = flat;
+  for (let word of addedShortsThatFail) {
+    const fix = word + "__#|§¤%!";
+    shortFixes[addedShortsThatFail] = fix;
+  }
+  const fixedFlatHtml = list.map(e => Object.assign(e, { word: shortFixes[e.word] ?? e.word }));
+  const three = FlatHtml.fromArray(fixedFlatHtml);
+
+  console.log("one:\n" + one.toString());
+  console.log("two:\n" + two.toString());
+  console.log("three:\n" + three.side(2).toString());
+
+  const triggers = list.filter(({ type }) => type === FlatHtml.TRIGGER);
+  const reactions = list.filter(({ type }) => type === FlatHtml.REACTION);
+  console.log("Triggers:", triggers);
+  console.log("Reactions:", reactions);
+
+</script>

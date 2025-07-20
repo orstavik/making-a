@@ -83,12 +83,13 @@
 <div></div>
 
 <script type="module">
-  import { diffRaw, diff, backtrace, levenshteinMinimalShifts } from "./difference.js";
-  import { FlatHtml, FlatHtmlDiff } from "./FlatHtml.js";
-  import test1 from "./tests/test1.js";
-  import test2 from "./tests/test2.js";
-  import test3 from "./tests/test3.js";
-  import test4 from "./tests/test4.js";
+  import { diffRaw, diff, backtrace, levenshteinMinimalShifts } from "../difference.js";
+  import { FlatHtml } from "../FlatHtml.js";
+  import test1 from "./test1.js";
+  import test2 from "./test2.js";
+  import test3 from "./test3.js";
+  import test4 from "./test4.js";
+  const htmlTests = [test1, test2, test3, test4];
 
   function recalculateLeveN({ type, x, y }, i, W) {
     const n2 = ++y * W + ++x;
@@ -187,10 +188,14 @@
     ["Hello, world!", "Hello world", [[5, 5], [1, 0], [6, 6], [1, 0]]]
   ];
 
-  function printTest(res, duration, A, B, actions, table, trace) {
-    const quickcheck = actions.map(({ a, b }) => [a.length, b.length]);
-    const noMatch = quickcheck.findIndex((actual, i) => JSON.stringify(actual) !== JSON.stringify(res[i]));
-    const wsOnly = actions.every(({ a, b }, i) => a == b || !(a + b).trim());
+  function printConsole(A, B, duration, noMatch) {
+    const Ax = visualizeHtmlText(A.substr(0, 25));
+    const Bx = visualizeHtmlText(B.substr(0, 25));
+    const res = noMatch ? `❌ ${noMatch}` : "✅";
+    console.log(`${res} ${duration.toFixed(1)}🕓 ${Ax} ⚔️ ${Bx}`);
+  }
+
+  function printTest(noMatch, duration, A, B, actions, table, trace) {
     const Ax = visualizeHtmlText(A.substr(0, 25));
     const Bx = visualizeHtmlText(B.substr(0, 25));
     document.body.querySelector("div").insertAdjacentHTML("beforeend", `<div class="${noMatch >= 0 ? "error" : "success"}">
@@ -198,11 +203,6 @@
         ${actionsView(actions)}
         ${levenToHTML(table, trace, A, B)}
       </div>`);
-    noMatch >= 0 ?
-      console.error(
-        `❌${wsOnly ? `👻` : ""} ${duration.toFixed(1)}🕓 ${Ax} ⚔️ ${Bx}\n`,
-        `didn't expect this action #${noMatch}: ${JSON.stringify(actions[noMatch])}`) :
-      console.log(`✅${wsOnly ? `👻` : ""} ${duration.toFixed(1)}🕓 ${Ax} ⚔️ ${Bx}`);
   }
 
   function runTest(A, B, res) {
@@ -211,26 +211,22 @@
     const start = performance.now();
     const actions = diff(A, B);
     const duration = performance.now() - start;
-    printTest(res, duration, A, B, actions, table, trace);
+    const quickcheck = actions.map(({ a, b }) => [a.length, b.length]);
+    const noMatch = actions[quickcheck.findIndex((actual, i) => JSON.stringify(actual) !== JSON.stringify(res[i]))];
+    printTest(noMatch, duration, A, B, actions, table, trace);
+    printConsole(A, B, duration, noMatch);
   }
 
-  function runHTMLtest(A, B, res, aCount, aTypes) {
+  function runHTMLtest(A, B, expected) {
     const start = performance.now();
-    const diff = new FlatHtmlDiff(A, B);
+    const diff = FlatHtml.fromString(A).diff(B);
     const duration = performance.now() - start;
-    printTest(res, duration, A, B, diff.diffs);
-    let { types, words } = new FlatHtml(A);
-    types = types.join("");
-    types == aTypes && words.length == aCount ?
-      console.log(`✅📄html`) :
-      console.error(`❌📄html\ncount expected/actual: ${aCount}/${words.length}\ntype expected/actual\n${aTypes}\n${types}`);
+    const actual = diff.atw();
+    const i = expected.findIndex((exp, i) => exp != actual[i]);
+    const noMatch = i >= 0 && `#${actual[i]}\nis not equal to\n#${expected[i]}\nat index: ${i}`;
+    printConsole(A, B, duration, noMatch);
   }
 
-  for (let [A, B, res] of tests)
-    runTest(A, B, res);
-
-  runHTMLtest(...test1);
-  runHTMLtest(...test2);
-  runHTMLtest(...test3);
-  runHTMLtest(...test4);
+  tests.forEach(t => runTest(...t));
+  htmlTests.forEach(t => runHTMLtest(...t));
 </script>
