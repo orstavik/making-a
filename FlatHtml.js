@@ -1,4 +1,4 @@
-import { diffRaw } from "./difference.js";
+import { diffRaw, diff } from "./difference.js";
 
 const START_TAG_HEAD_A = /<([a-z][a-z0-9-]*)/ig;
 const AT_BODY = /\s+([a-z_][a-z0-9.:_-]*)(?:\s*=\s*(?:"((?:\\.|[^"])*)"|'((?:\\.|[^'])*)'|([^>\s]+)))?/ig;
@@ -106,7 +106,7 @@ function toString(atWords) {
   return txt + POSTS[atWords.at(-1)[1]] ?? "";
 }
 
-export class FlatHtml {
+class FlatHtml {
   static TAG_START = "A";
   static TAG_END = "B";
   static COMMENT = "C";
@@ -149,3 +149,7 @@ export class FlatHtml {
     return new FlatHtml(parseHTML(str).map(tWord => "0" + tWord));
   }
 }
+export {
+  diff,
+  FlatHtml,
+};
