@@ -135,7 +135,7 @@ class FlatHtml {
       throw new TypeError("Argument must be string or FlatHtml.");
     const raws = diffRaw(this.#atw, B.#atw);
     const diffs = raws.flatMap(({ type: action, a, b }) =>
-      action == "add" ? b.map(b => "2" + b.slice(1)) :
+      action == "ins" ? b.map(b => "2" + b.slice(1)) :
         action == "del" ? a.map(a => "1" + a.slice(1)) :
           a.map(a => "0" + a.slice(1))
     );

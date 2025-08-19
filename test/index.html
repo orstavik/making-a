@@ -31,7 +31,7 @@
     position: relative;
   }
 
-  div.mono>div:is(.del, .add, .cross, .match):hover::before {
+  div.mono>div:is(.del, .ins, .cross, .match):hover::before {
     content: attr(a) " / " attr(b);
     position: absolute;
     bottom: 80%;
@@ -47,7 +47,7 @@
     background-color: salmon;
   }
 
-  div.mono>div.add {
+  div.mono>div.ins {
     background-color: plum;
   }
 
@@ -93,7 +93,7 @@
 
   function recalculateLeveN({ type, x, y }, i, W) {
     const n2 = ++y * W + ++x;
-    return n2 + (type !== "del" ? i : 0) + (type != "add" ? i * W : 0);
+    return n2 + (type !== "del" ? i : 0) + (type != "ins" ? i * W : 0);
   }
 
   function tableWithTrace(table, bt, A, B) {
@@ -112,7 +112,7 @@
   }
 
   function levenToHTML(rows, bt, A, B) {
-    if (!rows || !bt || A.length * B.length > 500)
+    if (!rows || !bt || A.length * B.length > 3000)
       return "";
     const table = tableWithTrace(rows, bt, A, B);
     return `<div class="mono" style="grid-template-columns: repeat(${B.length + 2}, max-content);">
@@ -124,9 +124,9 @@
   function* iterateMatchDiff(arr) {
     for (let i = 0; i < arr.length; i++) {
       let one = arr[i], two = arr[i + 1];
-      if (one.type === "add" && two?.type === "del")
+      if (one.type === "ins" && two?.type === "del")
         two = arr[i], one = arr[i + 1];
-      yield one.type === "del" && two?.type === "add" ?
+      yield one.type === "del" && two?.type === "ins" ?
         (i++, { a: one.a, b: two.b, type: "diff" }) :
         one;
     }
@@ -157,6 +157,32 @@
   }
 
   const tests = [
+    //better paths!!
+    ["ab", "a_babx", [[0, 3], [2, 2], [0, 1]]],
+    ["a_b_abx", "ab", [[4, 0], [2, 2], [1, 0]]],
+    ["xxa_b_abx", "ab", [[6, 0], [2, 2], [1, 0]]],
+    ["abc", "ababcbc", [[0, 2], [3, 3], [0, 2]]],
+    ["a_b_cabc_ab_c", "abc", [[5, 0], [3, 3], [5, 0]]],
+
+    ["ab", "a_bab", [[0, 3], [2, 2]]],
+
+
+    ["abcbc", "abc", [[3, 3], [2, 0]]],
+    ["aaaa", "aa", [[2, 0], [2, 2]]],
+    ["", "", []],
+    ["abc", "", [[3, 0]]],
+    ["", "abc", [[0, 3]]],
+    ["ab", "bc", [[1, 0], [1, 1], [0, 1]]],
+    ["abc", "abc", [[3, 3]]],
+    ["flaw", "lawn", [[1, 0], [3, 3], [0, 1]]],
+    ["a", "b", [[1, 0], [0, 1]]],
+    ["abcdef", "ghijkl", [[6, 0], [0, 6]]],
+    ["abcde", "abXYe", [[2, 2], [2, 0], [0, 2], [1, 1]]],
+    ["The quick brown fox", "The quick brown fix", [[17, 17], [1, 0], [0, 1], [1, 1]]],
+    ["Hello, world!", "Hello world", [[5, 5], [1, 0], [6, 6], [1, 0]]],
+    ["kitten", "sitting", [[1, 0], [0, 1], [3, 3], [1, 0], [0, 1], [1, 1], [0, 1]]],
+    ["ab", "ab_a_b", [[2, 2], [0, 4]]],
+    ["ab_a_bx", "ab", [[2, 2], [5, 0]]],
     [".ab.", "_ab_a_b_", [[1, 0], [0, 1], [2, 2], [1, 0], [0, 5]]],
     ["aa", "bb", [[2, 0], [0, 2]]],
     ["a", "b", [[1, 0], [0, 1]]],
@@ -166,32 +192,19 @@
     ["baaaa", "aa", [[3, 0], [2, 2]]],
     ["aby", "abx", [[2, 2], [1, 0], [0, 1]]],
     ["ab", "ab_a_bxx", [[2, 2], [0, 6]]],
-    ["ab", "a_b_abxx", [[0, 4], [2, 2], [0, 2]]],
-    ["ab_a_bx", "ab", [[2, 2], [5, 0]]],
-    ["a_b_abx", "ab", [[4, 0], [2, 2], [1, 0]]],
-    ["xxa_b_abx", "ab", [[6, 0], [2, 2], [1, 0]]],
-    ["ab", "ab_a_b", [[2, 2], [0, 4]]],
-    ["abc", "ababcbc", [[0, 2], [3, 3], [0, 2]]],
-    ["abcbc", "abc", [[3, 3], [2, 0]]],
-    ["kitten", "sitting", [[1, 0], [0, 1], [3, 3], [1, 0], [0, 1], [1, 1], [0, 1]]],
-    ["abc", "abc", [[3, 3]]],
-    ["a_b_cabc_ab_c", "abc", [[5, 0], [3, 3], [5, 0]]],
-    ["", "", []],
-    ["abc", "", [[3, 0]]],
-    ["", "abc", [[0, 3]]],
-    ["abcdef", "ghijkl", [[6, 0], [0, 6]]],
-    ["aaaa", "aa", [[2, 2], [2, 0]]],
-    ["radar", "radar", [[5, 5]]],
-    ["abcdef", "abXYef", [[2, 2], [2, 0], [0, 2], [2, 2]]],
-    ["flaw", "lawn", [[1, 0], [3, 3], [0, 1]]],
-    ["The quick brown fox", "The quick brown fix", [[17, 17], [1, 0], [0, 1], [1, 1]]],
-    ["Hello, world!", "Hello world", [[5, 5], [1, 0], [6, 6], [1, 0]]]
+    ["axxc", "abbc", [[1, 1], [2, 0], [0, 2], [1, 1]]],
+    ["{ a}", "{  a }", [[2, 2], [0, 1], [1, 1], [0, 1], [1, 1]]],
+    ["{a}", "{ a }", [[1, 1], [0, 1], [1, 1], [0, 1], [1, 1]]],
+    ["abc", "abbc", [[2, 2], [0, 1], [1, 1]]],
+    ["{ aabb}", "{  aa bb }", [[2, 2], [0, 1], [2, 2], [0, 1], [2, 2], [0, 1], [1, 1]]],
+
+
   ];
 
   function printConsole(A, B, duration, noMatch) {
     const Ax = visualizeHtmlText(A.substr(0, 25));
     const Bx = visualizeHtmlText(B.substr(0, 25));
-    const res = noMatch ? `❌ ${noMatch}` : "✅";
+    const res = noMatch ? `❌ ${JSON.stringify(noMatch)}` : "✅";
     console.log(`${res} ${duration.toFixed(1)}🕓 ${Ax} ⚔️ ${Bx}`);
   }
 
