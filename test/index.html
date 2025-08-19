@@ -90,6 +90,8 @@
   import test3 from "./test3.js";
   import test4 from "./test4.js";
   const htmlTests = [test1, test2, test3, test4];
+  import testBig from "./testBig.js";
+  const bigTests = [testBig];
 
   function recalculateLeveN({ type, x, y }, i, W) {
     const n2 = ++y * W + ++x;
@@ -242,4 +244,5 @@
 
   tests.forEach(t => runTest(...t));
   htmlTests.forEach(t => runHTMLtest(...t));
+  bigTests.forEach(t => runTest(...t));
 </script>
