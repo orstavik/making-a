@@ -1,12 +1,8 @@
-const EDIT = 1 << 16;
-const STREAKEND = 1;
-const EDITSTREAK = EDIT + STREAKEND;
-
 export function levenshteinMinimalShifts(A, B) {
   const H = A.length, W = B.length, H2 = H + 1, W2 = W + 1, L = H2 * W2;
   const edits = new Uint16Array(L);
   const shifts = new Uint16Array(L);
-  const state = new Uint8Array(L);  // 0: diagonal (match/substitute), 1: left (insert), 2: up (delete)
+  const state = new Uint8Array(L);  // 0: diagonal (match), 1: left (insert), 2: up (delete), 3: start
 
   edits[0] = 0; shifts[0] = 0; state[0] = 3;
 
