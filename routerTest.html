@@ -1,0 +1,162 @@
+<h2>Router</h2>
+<div>
+  To set up a router, you need a map of path to endPoints:
+</div>
+<ol>
+  <li>List the endPoint functions as [...wrapperFunction, endPointFunction],
+    and use the Router.reduceFunc to turn this into a single function.</li>
+  <li>The sequence of functions in the map is outermost wrapper to innermost endPointFunction.
+    This establishes a visual pattern in the definition map that is easy to read.</li>
+  <li>Add the HTTP method (GET, POST) as the first path/route segment.</li>
+</ol>
+<h3>Example code</h3>
+<pre>
+  const endPoints = {
+  "GET/admin/":
+    [Main, GoogleAuth, fetchAsset],
+  "GET/admin/checkLogin":
+    [Main, GoogleAuth, checkLogin],
+  "GET/admin/uploaded-images":
+    [Main, GoogleAuth, listAllUploadedImages],
+  "GET/admin/uploadImageURL":
+    [Main, GoogleAuth, uploadImage],
+  "GET/admin/files.json":
+    [Main, GoogleAuth, ShaETag, CacheOnSha, makeFilesJson],
+  "POST/admin/addFile":
+    [Main, GoogleAuth, putToGithub],
+
+  "GET/data/":
+    [Main, SameSite, fetchAsset],
+
+  "GET/auth/login":
+    [Main, redirectToGoogle],
+  "GET/auth/logout":
+    [Main, logout],
+  "GET/auth/callback":
+    [Main, googleCallback],
+
+  "GET/v/:sha/":
+    [Main, CacheOnSha, getFromGithub],
+};
+
+for (let p in endPoints)
+  endPoints[p] = Router.reduceFunc(endPoints[p]);
+const router = new Router(endPoints);
+</pre>
+
+<h2>Router Usage</h2>
+<div>
+  The router is used in the onFetch function as follows:
+</div>
+<ol>
+  <li>The router will match the route to an endPoint `{func, names, params}`, or undefined.</li>
+  <li>For a route like GET/user/:user/role/:role matched against a path like /user/bob/role/boss,
+    the params object will be {0: "bob", user: "bob", 1: "boss", role: "boss"}.</li>
+</ol>
+<h3>Example code</h3>
+<pre>
+async function onFetch(req, env, ctx) {
+  const endPoint = router.match(req.method + req.url.pathname);
+  if (!endPoint)
+    return new Response("Not found", { status: 404 });
+  const { func, params } = endPoint;
+  req.params = params;
+  return func(req, env, ctx);
+}
+</pre>
+
+<h2>Router priority:</h2>
+<div>"/fixed/path" before "/:param/path" before "/fallback/*".</div>
+<ol>
+  <lh>Router priority:</lh>
+  <li>fixed endPoint "whatever/something"</li>
+  <li>param endPoint "whatever/:param"</li>
+  <li>fixed fallback "whatever/*"</li>
+  <li>param fallback ":param/*"</li>
+</ol>
+
+Example:
+<pre>
+{
+  "/admin": 1,
+  "/admin/*": 3,
+  "/admin/manifest.json": 1,
+  "/admin/files/*": 3,
+  "/admin/files/hello.txt": 1,
+  "/user/root": 1,
+  "/user/:user": 2,
+  "/user/:user/something": 1,
+  "/user/:user/else": 1,
+  "/user/:user/*": 4,
+  "/user/root/something": 1,
+}
+</pre>
+
+<ol>
+  <li>"/admin" vs "/admin/*":
+    We want the index.html of "example.com/admin" to be separate from
+    the function that parses paths like "example.com/admin/selection/this?or=that".
+  </li>
+  <li>"/admin/*" vs "/admin/manifest.json":
+    We want to be able to override the "/admin/" generic handler for specific paths.
+  </li>
+  <li>"/admin/*" vs "/admin/files/*" vs "/admin/files/hello.txt":
+    More precise routes override less precise routes.
+  </li>
+  <li>"/admin/user/root" vs "/admin/user/:user":
+    Static routes override param routes.
+  </li>
+  <li>"/admin/user/:user" vs "/admin/user/*":
+    /admin/user/bob => /admin/user/:user <br>
+    /admin/user/bob/something => /admin/user/*
+  </li>
+</ol>
+
+<script type="module">
+  import { Router } from "../router.js";
+
+  const OG = console.log;
+  console.log = (...args) => { OG(...args); document.body.append(Object.assign(document.createElement("pre"), { textContent: args.join(" ") })) };
+
+  const one = p => "one" + (p ? JSON.stringify(p) : "");
+  const two = p => "two" + (p ? JSON.stringify(p) : "");
+  const three = p => "three" + (p ? JSON.stringify(p) : "");
+  const four = p => "four" + (p ? JSON.stringify(p) : "");
+
+  const RouterTests = [
+    {
+      name: "test1",
+      def: {
+        "GET/*": one,
+        "GET/admin/*": two,
+        "GET/data/aPath.json": three,
+        "GET/v/:sha/*": four,
+      },
+      routerToString:
+        `GET/admin/*: two[]
+GET/data/aPath.json: three[]
+GET/v/:param/*: four[,,sha]
+GET/*: one[]`,
+      pairs: [
+        { pathname: '/v/sha1234/bob', res: 'four{"2":"sha1234","sha":"sha1234"}' },
+        { pathname: '/404', res: 'one{}' },
+        { pathname: '/', res: 'one{}' },
+        { pathname: '/admin/', res: 'two{}' },
+        { pathname: '/data/aPath.json', res: 'three{}' },
+        // { pathname: '/sha1234/bob', res: 'one' },
+      ]
+    }
+  ]
+  for (let { name, def, routerToString, pairs } of RouterTests) {
+    const router = new Router(def, true);
+    console.log("SETUP", router.toString() === routerToString);
+    for (let { pathname, res } of pairs) {
+      const { func, params } = router.match("GET" + pathname);
+      const output = func(params).toString();
+      if (output === res)
+        console.log(func.name, true);
+      else
+        console.log(func.name, params, output, res);
+    }
+  }
+</script>
