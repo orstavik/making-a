@@ -1,0 +1,19 @@
+<h1>Iframe tester</h1>
+<p>
+  The test is just adding a piece of html and then outputting the
+  <code>document.outerHTML</code> after a short debounce for every mutation.
+</p>
+<pre></pre>
+
+<template>
+  <h1>hello</h1>
+  <script>setTimeout(_ => document.querySelector("h1").insertAdjacentHTML("afterend", "<p>sunshine</p>"), 50);</script>
+</template>
+<script type="module">
+  import { runTest } from "../iframeTester.js";
+
+  const template = document.querySelector("template").innerHTML;
+  const { iframe, results } = runTest(template);
+  for await (const r of results)
+    document.querySelector("pre").textContent += r + "\n\n";
+</script>
