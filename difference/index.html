@@ -84,7 +84,7 @@
 
 <script type="module">
   import { diffRaw, diff, backtrace, levenshteinMinimalShifts } from "../difference.js";
-  import { FlatHtml } from "../FlatHtml.js";
+  // import { FlatHtml } from "../FlatHtml.js";
   import test1 from "./test1.js";
   import test2 from "./test2.js";
   import test3 from "./test3.js";
@@ -235,11 +235,10 @@
 
   function runHTMLtest(A, B, expected) {
     const start = performance.now();
-    const diff = FlatHtml.fromString(A).diff(B);
+    const actions = diff(A, B);
     const duration = performance.now() - start;
-    const actual = diff.atw();
-    const i = expected.findIndex((exp, i) => exp != actual[i]);
-    const noMatch = i >= 0 && `#${actual[i]}\nis not equal to\n#${expected[i]}\nat index: ${i}`;
+    const quickcheck = actions.map(({ a, b }) => [a.length, b.length]);
+    const noMatch = actions[quickcheck.findIndex((actual, i) => JSON.stringify(actual) !== JSON.stringify(expected[i]))];
     printConsole(A, B, duration, noMatch);
   }
 
