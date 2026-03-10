@@ -1,0 +1,97 @@
+<style>
+  :root { font-size: 10px; }
+  /*selectors*/
+  span.d { border-bottom: 2rem solid #0f0; }
+  span:where(.d) { border-bottom: 1rem dotted #000; }
+  @layer a {
+    span.a > span:has(#c, .d) span:first-child:not(.d, #dummy[bob~="#somethign:else"]) { border-left: 1rem dotted #000 !important; }
+    span.a > span:has(#c, .d) span:first-child:not(.d, #dummy[bob*="#somethign"]) { border-left: 2rem solid #0f0 !important; }
+  }
+  @layer b {
+    span.a > span:has(#c, .d) span:first-child:not(.d, #dummy[bob$="##somethign"]) { border-left: 1rem dotted #000 !important; }
+  }
+  /*media and supports filtered out*/
+  @supports(display: block) { @media (max-width: 1px) { div { border-bottom: 10rem pink solid !important; } } }
+  @media (min-width: 1px) { @supports(foo: bar) { div { border-bottom: 10rem pink solid !important; } } }
+  /*media and supports filtered in*/
+  @layer alice {
+    @media (min-width: 1px){
+      @supports(display: block){
+        @layer bob {
+          div {
+            border-top: 1rem solid #0f0;
+            border-left: 1rem solid #0f0  !important;
+            border-right: 1rem solid #0f0;
+          }
+        }
+      }
+    }
+  }
+
+
+  @layer id {
+    #top {
+      border-top: 2rem solid #f00;
+      border-left: 2rem solid #f00 !important;
+      border-right: 2rem solid #f00 !important;
+    }
+  }
+  @layer clz{
+    .top {
+      border-top: 1rem dotted #000;
+      border-left: 1rem dotted #000 !important;
+      border-right: 1rem dotted #000;
+    }
+    .top.top.top {
+      border-top: 4rem solid #00f;
+      border-left: 4rem dotted #00f !important;
+      border-right: 4rem solid #00f !important;
+    }
+    .top.top {
+      border-top: 3rem dotted #000;
+      border-left: 3rem dotted #000 !important;
+      border-right: 3rem dotted #000;
+    }
+  }
+  @layer one,two;
+  @layer two {
+    div { font-family: "ui-monospace", monospace; }
+  }
+  @layer one {
+    div { font-family: "Gill Sans Extrabold", sans-serif; }
+  }
+</style>
+
+<span id=a class=a>a<span id=b class=b>b<span id=c class=c>c</span><span id=d class=d>d</span></span></span>
+
+<div class="top">.top</div>
+<div id="top">#top</div>
+<div id="top" class="top">#top.top</div>
+<div>div</div>
+
+
+<pre>
+  result: 
+</pre>
+<script type="module">
+  import { GetComputedStyleRaw } from "../getComputedStyleRaw.js";
+  const getComputedStyleRaw = GetComputedStyleRaw();
+
+  function test(el) {
+    const raw = getComputedStyleRaw(el);
+    if (!Object.keys(raw).length)
+      return true;
+    const tmp = getComputedStyle(el);
+    const comp = {};
+    const raw2 = {};
+    for (let p in raw) {
+      comp[p] = tmp[p];
+      raw2[p] = raw[p].endsWith("rem") ? raw[p].slice(0, -3) + "0px" : raw[p];
+    }
+    return JSON.stringify(raw) != JSON.stringify(comp) && JSON.stringify(raw2) == JSON.stringify(comp);
+  }
+
+  const pre = document.querySelector("pre");
+  for (let el of document.querySelectorAll("div,span"))
+    pre.innerText += `${test(el) ? "OK" : "ERRORerrorERROR"}: ${el.innerText}\n`;
+</script>
