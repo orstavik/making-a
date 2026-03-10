@@ -1,10 +1,9 @@
-function selectorSpecificity(selector) {
+function specificity(selector) {
   const QuoteRX = /(["'])(?:(?=(\\?))\2.)*?\1/gi;
   const ClassRX = /(\.[^\s()#.[\]>+~*,:"']+|\[[^\]]*\]|:(?!(is|not|has|where))[\w-]+(\([^)(]*\))?)/gi; //replace with "."
   const IdRX = /#[^\s()#.[\]>+~*,:"']+/gi;
   const TagRX = /(?<![:\w-])[\w-]+/gi;
   const PseudoRX2 = /:(is|not|has|where)\(([^)(]*)\)/;
-
 
   let s = selector.replaceAll(QuoteRX, '');
   s = s.replaceAll(IdRX, "#");
@@ -14,12 +13,11 @@ function selectorSpecificity(selector) {
   s = s.replaceAll(/[#.x]+/g, c =>
     c.split("").reduce((acc, n) => acc + (n == "#" ? 1000_000 : n == "." ? 1000 : 1), 0));
 
-  for (let m; m = s.match(PseudoRX2);) {
-    let innerNums = m[2].split(",").map(expr => expr.match(/\d+/g).map(Number).reduce((a, b) => a + b, 0));
-    let max = (m[1] === "where" || !innerNums) ? "" : Math.max(...innerNums.map(Number));
-    s = s.replaceAll(m[0], " " + max + " ");
-  }
-  return s.match(/\d+/g).map(Number).reduce((a, b) => a + b, 0);
+  const calcExpr = s => s.match(/\d+/g).map(Number).reduce((a, b) => a + b, 0);
+  for (let m; m = s.match(PseudoRX2);)
+    s = s.replaceAll(m[0], m[1] === "where" ? "" :
+      "|" + Math.max(...m[2].split(",").map(calcExpr)) + "|");
+  return calcExpr(s);
 }
 
 export function GetComputedStyleRaw(SHEETS = document.styleSheets) {
@@ -73,7 +71,7 @@ export function GetComputedStyleRaw(SHEETS = document.styleSheets) {
       const pseudo = r.rule.selectorText.match(PSEUDO);
       r.pseudo = pseudo?.[2];
       r.selector = pseudo ? pseudo[1] + (pseudo[3] || "") : r.rule.selectorText;
-      r.priority = ((layers.indexOf(r.layer) + 1) * 100_000_000) + selectorSpecificity(r.selector);
+      r.priority = ((layers.indexOf(r.layer) + 1) * 100_000_000) + specificity(r.selector);
     }
     return allRules.sort((a, b) => a.priority - b.priority);
   }
