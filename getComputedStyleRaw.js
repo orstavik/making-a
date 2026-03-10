@@ -15,7 +15,7 @@ function selectorSpecificity(selector) {
     c.split("").reduce((acc, n) => acc + (n == "#" ? 1000_000 : n == "." ? 1000 : 1), 0));
 
   for (let m; m = s.match(PseudoRX2);) {
-    let innerNums = m[2].match(/\d+/g);
+    let innerNums = m[2].split(",").map(expr => expr.match(/\d+/g).map(Number).reduce((a, b) => a + b, 0));
     let max = (m[1] === "where" || !innerNums) ? "" : Math.max(...innerNums.map(Number));
     s = s.replaceAll(m[0], " " + max + " ");
   }

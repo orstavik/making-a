@@ -4,8 +4,9 @@
   span.d { border-bottom: 2rem solid #0f0; }
   span:where(.d) { border-bottom: 1rem dotted #000; }
   @layer a {
-    span.a > span:has(#c, .d) span:first-child:not(.d, #dummy[bob~="#somethign:else"]) { border-left: 1rem dotted #000 !important; }
-    span.a > span:has(#c, .d) span:first-child:not(.d, #dummy[bob*="#somethign"]) { border-left: 2rem solid #0f0 !important; }
+    span.a > span:has(#c, .d) span:first-child:not(.x, #x[bob~="#somethign:else"]) { border-left: 1rem dotted #000 !important; }
+    span.a > span:has(#c, .d) span:first-child:not(.x.x > #x, #x[bob*="#somethign"]) { border-left: 2rem solid #0f0 !important; }
+    span.a > span:has(#c, .d) span:first-child:not(.x, #x[bob*="#somethign"]) { border-left: 2rem dotted #000 !important; }
   }
   @layer b {
     span.a > span:has(#c, .d) span:first-child:not(.d, #dummy[bob$="##somethign"]) { border-left: 1rem dotted #000 !important; }
