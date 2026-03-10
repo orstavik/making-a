@@ -11,13 +11,8 @@ function selectorSpecificity(selector) {
   s = s.replaceAll(ClassRX, ".");
   s = s.replaceAll(TagRX, "x");
 
-  function calcPrecedence(str) {
-    let ids = str.match(/#/g)?.length || 0;
-    let classes = str.match(/\./g)?.length || 0;
-    let elements = str.match(/x/g)?.length || 0;
-    return ids * 1_000_000 + classes * 1_000 + elements;
-  }
-  s = s.replaceAll(/[#.x]+/g, calcPrecedence);
+  s = s.replaceAll(/[#.x]+/g, c =>
+    c.split("").reduce((acc, n) => acc + (n == "#" ? 1000_000 : n == "." ? 1000 : 1), 0));
 
   for (let m; m = s.match(PseudoRX2);) {
     let innerNums = m[2].match(/\d+/g);
