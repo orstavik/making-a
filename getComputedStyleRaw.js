@@ -1,6 +1,6 @@
 function specificity(selector) {
   const QuoteRX = /(["'])(?:(?=(\\?))\2.)*?\1/gi;
-  const ClassRX = /(\.[^\s()#.[\]>+~*,:"']+|\[[^\]]*\]|:(?!(is|not|has|where))[\w-]+(\([^)(]*\))?)/gi; //replace with "."
+  const ClassRX = /(\.[^\s()#.[\]>+~*,:"']+|\[[^\]]*\]|:(?!(is|not|has|where))[\w-]+(\([^)(]*\))?)/gi;
   const IdRX = /#[^\s()#.[\]>+~*,:"']+/gi;
   const TagRX = /(?<![:\w-])[\w-]+/gi;
   const PseudoRX2 = /:(is|not|has|where)\(([^)(]*)\)/;
@@ -13,7 +13,7 @@ function specificity(selector) {
   s = s.replaceAll(/[#.x]+/g, c =>
     c.split("").reduce((acc, n) => acc + (n == "#" ? 1000_000 : n == "." ? 1000 : 1), 0));
 
-  const calcExpr = s => s.match(/\d+/g).map(Number).reduce((a, b) => a + b, 0);
+  const calcExpr = s => s.match(/\d+/g)?.reduce((a, b) => a + +b, 0) ?? "";
   for (let m; m = s.match(PseudoRX2);)
     s = s.replaceAll(m[0], m[1] === "where" ? "" :
       "|" + Math.max(...m[2].split(",").map(calcExpr)) + "|");
@@ -101,6 +101,8 @@ export function GetComputedStyleRaw(SHEETS = document.styleSheets) {
       if (el.matches(r.selector))
         assignStyle(res, r.rule.style, r.layer);
     assignStyle(res, el.style, undefined);
-    return Object.fromEntries(Object.entries(res).map(([k, v]) => [k, v.value]));
+    for (let k in res)
+      res[k] = res[k].value;
+    return res;
   }
 }
