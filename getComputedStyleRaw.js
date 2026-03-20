@@ -59,7 +59,7 @@ export async function GetComputedStyleRaw(SHEETS = document.styleSheets, getCssR
       return ctx;
     }
 
-    async function flattenRules(ctx, flatRules, layers, sheet) {
+    async function flattenRules(ctx, flatRules, layers, others, sheet) {
       let rules = getCssRules(sheet);
       if (rules instanceof Promise)
         rules = await rules;
@@ -69,19 +69,21 @@ export async function GetComputedStyleRaw(SHEETS = document.styleSheets, getCssR
             layers.add(ctx.layer ? `${ctx.layer}.${name}` : name);
         else if (rule.selectorText && rule.style)
           flatRules.push({ ...ctx, rule });
+        else if (rule instanceof CSSFontFaceRule || rule instanceof CSSKeyframesRule)
+          others.push(rule);
         else {
           const nextCtx = makeInnerCtx(ctx, rule);
           if (nextCtx.layer != ctx.layer)
             layers.add(nextCtx.layer);
-          await flattenRules(nextCtx, flatRules, layers, rule);
+          await flattenRules(nextCtx, flatRules, layers, others, rule);
         }
       }
     }
 
-    const flatRules = [], layers = new Set();
+    const flatRules = [], layers = new Set(), others = [];
     for (let sheet of sheets)
-      await flattenRules({}, flatRules, layers, sheet);
-    return { flatRules, layers };
+      await flattenRules({}, flatRules, layers, others, sheet);
+    return { flatRules, layers, others };
   }
 
   const PSEUDO = /(.*?)(::[a-z-]+)((:[a-z-]+)*)$/i;
@@ -106,7 +108,7 @@ export async function GetComputedStyleRaw(SHEETS = document.styleSheets, getCssR
     return acc;
   }
 
-  const { flatRules, layers } = await getAllRules(SHEETS);
+  const { flatRules, layers, others } = await getAllRules([...SHEETS]);
   const rulesSorted = prepRules(flatRules, [...layers, undefined]);
   const allRules = rulesSorted.filter(r =>
     (!r.media || matchMedia(r.media).matches) && (!r.supports || CSS.supports(r.supports)))
@@ -115,6 +117,8 @@ export async function GetComputedStyleRaw(SHEETS = document.styleSheets, getCssR
     (RULES[r.pseudo || ""] ??= []).push(r);
 
   return function getComputedStyleRaw(el, pseudo = "") {
+    if (el == null)
+      return others;
     const res = assignStyle({}, el.style, undefined);
     for (let r of RULES[pseudo] ?? [])
       if (el.matches(r.selector))

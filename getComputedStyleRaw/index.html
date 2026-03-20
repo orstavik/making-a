@@ -1,5 +1,15 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Droid+Sans:400,700">
 <style>
+  @keyframes anime {
+    from {
+      border-width: 0;
+    }
+
+    to {
+      border-width: 10rem;
+    }
+  }
+
   :root {
     font-size: 10px;
   }
@@ -203,6 +213,23 @@
       raw2[p] = raw[p].endsWith("rem") ? raw[p].slice(0, -3) + "0px" : raw[p];
     }
     return JSON.stringify(raw) != JSON.stringify(comp) && JSON.stringify(raw2) == JSON.stringify(comp);
+  }
+
+  const expectedOthers = [
+    `@font-face { font-family: "Droid Sans"; font-style: normal; font-weight: 400; src: url("https://fonts.gstatic.com/s/droidsans/v19/SlGVmQWMvZQIdix7AFxXkHNSbQ.woff2") format("woff2"); unicode-range: U+0-FF, U+131, U+152-153, U+2BB-2BC, U+2C6, U+2DA, U+2DC, U+304, U+308, U+329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }`,
+    `@font-face { font-family: "Droid Sans"; font-style: normal; font-weight: 700; src: url("https://fonts.gstatic.com/s/droidsans/v19/SlGWmQWMvZQIdix7AFxXmMh3eDs1Zw.woff2") format("woff2"); unicode-range: U+0-FF, U+131, U+152-153, U+2BB-2BC, U+2C6, U+2DA, U+2DC, U+304, U+308, U+329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }`,
+    `@keyframes anime { 
+  0% { border-width: 0px; }
+  100% { border-width: 10rem; }
+}`,
+  ];
+
+  for (let { cssText } of getComputedStyleRaw()) {
+    cssText = cssText.trim();
+    if (expectedOthers.includes(cssText))
+      console.log(`✅OK: Rule correctly extracted:\n${cssText}\n`);
+    else
+      console.log(`❌ERROR: Extracted rule does not match stylesheet rule:\n${cssText}\n`);
   }
 
   for (let el of document.querySelectorAll("div,span"))
