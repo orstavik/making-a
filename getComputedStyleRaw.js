@@ -20,9 +20,30 @@ function specificity(selector) {
   return calcExpr(s);
 }
 
-export function GetComputedStyleRaw(SHEETS = document.styleSheets) {
+async function cssRulesFallback(sheetOrCtxRule, e) {
+  try {
+    return sheetOrCtxRule.cssRules;
+  } catch {
+    if (!sheetOrCtxRule.href)
+      return;
+    const txt = await fetch(sheetOrCtxRule.href).then(r => r.text());
+    const iframe = document.createElement("iframe");
+    iframe.style.display = "none";
+    document.body.appendChild(iframe);
+    const baseEl = iframe.ownerDocument.createElement("base");
+    baseEl.href = sheetOrCtxRule.href;
+    iframe.ownerDocument.head.appendChild(baseEl);
+    const styleEl = iframe.ownerDocument.createElement("style");
+    iframe.ownerDocument.head.appendChild(styleEl);
+    styleEl.textContent = txt;
+    document.body.removeChild(iframe);
+    return styleEl.sheet.cssRules;
+  };
+}
 
-  function getAllRules(sheets) {
+export async function GetComputedStyleRaw(SHEETS = document.styleSheets, getCssRules = cssRulesFallback) {
+
+  async function getAllRules(sheets) {
 
     function makeInnerCtx(ctx, rule) {
       let supports = rule instanceof CSSSupportsRule ? rule.conditionText : rule.supportsText;
@@ -38,8 +59,11 @@ export function GetComputedStyleRaw(SHEETS = document.styleSheets) {
       return ctx;
     }
 
-    function flattenRules(rules, ctx = {}, flatRules = [], layers = new Set()) {
-      for (const rule of rules) {
+    async function flattenRules(ctx, flatRules, layers, sheet) {
+      let rules = getCssRules(sheet);
+      if (rules instanceof Promise)
+        rules = await rules;
+      for (const rule of rules || []) {
         if (rule instanceof CSSLayerStatementRule)
           for (let name of rule.nameList)
             layers.add(ctx.layer ? `${ctx.layer}.${name}` : name);
@@ -49,20 +73,15 @@ export function GetComputedStyleRaw(SHEETS = document.styleSheets) {
           const nextCtx = makeInnerCtx(ctx, rule);
           if (nextCtx.layer != ctx.layer)
             layers.add(nextCtx.layer);
-          let innerRules = rule.cssRules;
-          if (rule.styleSheet)
-            try { innerRules = rule.styleSheet.cssRules } catch { }
-          if (innerRules?.length)
-            flattenRules(innerRules, nextCtx, flatRules, layers);
+          await flattenRules(nextCtx, flatRules, layers, rule);
         }
       }
-      return { flatRules, layers };
     }
 
-    const rules = [];
+    const flatRules = [], layers = new Set();
     for (let sheet of sheets)
-      try { rules.push(...sheet.cssRules); } catch (e) { }
-    return flattenRules(rules);
+      await flattenRules({}, flatRules, layers, sheet);
+    return { flatRules, layers };
   }
 
   const PSEUDO = /(.*?)(::[a-z-]+)((:[a-z-]+)*)$/i;
@@ -87,7 +106,7 @@ export function GetComputedStyleRaw(SHEETS = document.styleSheets) {
     return acc;
   }
 
-  const { flatRules, layers } = getAllRules(SHEETS);
+  const { flatRules, layers } = await getAllRules(SHEETS);
   const rulesSorted = prepRules(flatRules, [...layers, undefined]);
   const allRules = rulesSorted.filter(r =>
     (!r.media || matchMedia(r.media).matches) && (!r.supports || CSS.supports(r.supports)))

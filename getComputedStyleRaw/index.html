@@ -1,27 +1,63 @@
+<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Droid+Sans:400,700">
 <style>
-  :root { font-size: 10px; }
+  :root {
+    font-size: 10px;
+  }
+
   /*selectors*/
-  span.d { border-bottom: 2rem solid #0f0; }
-  span:where(.d) { border-bottom: 1rem dotted #000; }
+  span.d {
+    border-bottom: 2rem solid #0f0;
+  }
+
+  span:where(.d) {
+    border-bottom: 1rem dotted #000;
+  }
+
   @layer a {
-    span.a > span:has(#c, .d) span:first-child:not(.x, #x[bob~="#somethign:else"]) { border-left: 1rem dotted #000 !important; }
-    span.a > span:has(#c, .d) span:first-child:not(.x.x > #x, #x[bob*="#somethign"]) { border-left: 2rem solid #0f0 !important; }
-    span.a > span:has(#c, .d) span:first-child:not(.x, #x[bob*="#somethign"]) { border-left: 2rem dotted #000 !important; }
+    span.a>span:has(#c, .d) span:first-child:not(.x, #x[bob~="#somethign:else"]) {
+      border-left: 1rem dotted #000 !important;
+    }
+
+    span.a>span:has(#c, .d) span:first-child:not(.x.x > #x, #x[bob*="#somethign"]) {
+      border-left: 2rem solid #0f0 !important;
+    }
+
+    span.a>span:has(#c, .d) span:first-child:not(.x, #x[bob*="#somethign"]) {
+      border-left: 2rem dotted #000 !important;
+    }
   }
+
   @layer b {
-    span.a > span:has(#c, .d) span:first-child:not(.d, #dummy[bob$="##somethign"]) { border-left: 1rem dotted #000 !important; }
+    span.a>span:has(#c, .d) span:first-child:not(.d, #dummy[bob$="##somethign"]) {
+      border-left: 1rem dotted #000 !important;
+    }
   }
+
   /*media and supports filtered out*/
-  @supports(display: block) { @media (max-width: 1px) { div { border-bottom: 10rem pink solid !important; } } }
-  @media (min-width: 1px) { @supports(foo: bar) { div { border-bottom: 10rem pink solid !important; } } }
+  @supports(display: block) {
+    @media (max-width: 1px) {
+      div {
+        border-bottom: 10rem pink solid !important;
+      }
+    }
+  }
+
+  @media (min-width: 1px) {
+    @supports(foo: bar) {
+      div {
+        border-bottom: 10rem pink solid !important;
+      }
+    }
+  }
+
   /*media and supports filtered in*/
   @layer alice {
-    @media (min-width: 1px){
-      @supports(display: block){
+    @media (min-width: 1px) {
+      @supports(display: block) {
         @layer bob {
           div {
             border-top: 1rem solid #0f0;
-            border-left: 1rem solid #0f0  !important;
+            border-left: 1rem solid #0f0 !important;
             border-right: 1rem solid #0f0;
           }
         }
@@ -37,55 +73,103 @@
       border-right: 2rem solid #f00 !important;
     }
   }
-  @layer clz{
+
+  @layer clz {
     .top {
       border-top: 1rem dotted #000;
       border-left: 1rem dotted #000 !important;
       border-right: 1rem dotted #000;
     }
+
     .top.top.top {
       border-top: 4rem solid #00f;
       border-left: 4rem dotted #00f !important;
       border-right: 4rem solid #00f !important;
     }
+
     .top.top {
       border-top: 3rem dotted #000;
       border-left: 3rem dotted #000 !important;
       border-right: 3rem dotted #000;
     }
   }
-  @layer one,two;
+
+  @layer one, two;
+
   @layer two {
-    div { font-family: "ui-monospace", monospace; }
+    div {
+      font-family: "ui-monospace", monospace;
+    }
   }
+
   @layer one {
-    div { font-family: "Gill Sans Extrabold", sans-serif; }
+    div {
+      font-family: "Gill Sans Extrabold", sans-serif;
+    }
   }
 
   /* 1. :is() and :where() Specificity Spec */
-  :where(.where-test) { padding-top: 1rem; } /* Specificity: 0, 0, 0 */
-  .where-test { padding-top: 2rem; } /* Specificity: 0, 1, 0 (Wins) */
+  :where(.where-test) {
+    padding-top: 1rem;
+  }
 
-  :is(#dummy, .is-test) { padding-bottom: 3rem; } /* Specificity takes max argument: 1, 0, 0 (Wins) */
-  .is-test { padding-bottom: 2rem; } /* Specificity: 0, 1, 0 */
+  /* Specificity: 0, 0, 0 */
+  .where-test {
+    padding-top: 2rem;
+  }
+
+  /* Specificity: 0, 1, 0 (Wins) */
+
+  :is(#dummy, .is-test) {
+    padding-bottom: 3rem;
+  }
+
+  /* Specificity takes max argument: 1, 0, 0 (Wins) */
+  .is-test {
+    padding-bottom: 2rem;
+  }
+
+  /* Specificity: 0, 1, 0 */
 
   /* 2. Source Order Fallback Spec */
-  .source-order-test { text-indent: 1rem; }
-  .source-order-test { text-indent: 2rem; } /* Identical specificity, later source wins */
+  .source-order-test {
+    text-indent: 1rem;
+  }
+
+  .source-order-test {
+    text-indent: 2rem;
+  }
+
+  /* Identical specificity, later source wins */
 
   /* 3. Inline vs !important Spec */
-  .important-test { margin-top: 1rem !important; margin-bottom: 1rem; }
+  .important-test {
+    margin-top: 1rem !important;
+    margin-bottom: 1rem;
+  }
 
   /* 4. Layer !important Inversion Spec */
   @layer bottom, top;
+
   @layer bottom {
-    .layer-imp-test { margin-left: 1rem !important; margin-right: 1rem; }
+    .layer-imp-test {
+      margin-left: 1rem !important;
+      margin-right: 1rem;
+    }
   }
+
   @layer top {
-    .layer-imp-test { margin-left: 2rem !important; margin-right: 2rem; }
+    .layer-imp-test {
+      margin-left: 2rem !important;
+      margin-right: 2rem;
+    }
   }
+
   /* Unlayered */
-  .layer-imp-test { margin-left: 3rem !important; margin-right: 3rem; }
+  .layer-imp-test {
+    margin-left: 3rem !important;
+    margin-right: 3rem;
+  }
 </style>
 
 <span id=a class=a>a<span id=b class=b>b<span id=c class=c>c</span><span id=d class=d>d</span></span></span>
@@ -103,12 +187,9 @@
 
 <div class="layer-imp-test">Layer !important Inversion</div>
 
-<pre>
-  result: 
-</pre>
 <script type="module">
   import { GetComputedStyleRaw } from "../getComputedStyleRaw.js";
-  const getComputedStyleRaw = GetComputedStyleRaw();
+  const getComputedStyleRaw = await GetComputedStyleRaw();
 
   function test(el) {
     const raw = getComputedStyleRaw(el);
@@ -124,7 +205,6 @@
     return JSON.stringify(raw) != JSON.stringify(comp) && JSON.stringify(raw2) == JSON.stringify(comp);
   }
 
-  const pre = document.querySelector("pre");
   for (let el of document.querySelectorAll("div,span"))
-    pre.innerText += `${test(el) ? "OK" : "ERRORerrorERROR"}: ${el.innerText}\n`;
+    console.log(`${test(el) ? "✅OK" : "❌ERROR"}: ${el.innerText}\n`);
 </script>
