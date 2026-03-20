@@ -70,7 +70,7 @@ export async function GetComputedStyleRaw(SHEETS = document.styleSheets, getCssR
         else if (rule.selectorText && rule.style)
           flatRules.push({ ...ctx, rule });
         else if (rule instanceof CSSFontFaceRule || rule instanceof CSSKeyframesRule)
-          others.push(rule);
+          others.push({ ...ctx, rule });
         else {
           const nextCtx = makeInnerCtx(ctx, rule);
           if (nextCtx.layer != ctx.layer)

@@ -1,15 +1,5 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Droid+Sans:400,700">
 <style>
-  @keyframes anime {
-    from {
-      border-width: 0;
-    }
-
-    to {
-      border-width: 10rem;
-    }
-  }
-
   :root {
     font-size: 10px;
   }
@@ -34,6 +24,16 @@
 
     span.a>span:has(#c, .d) span:first-child:not(.x, #x[bob*="#somethign"]) {
       border-left: 2rem dotted #000 !important;
+    }
+
+    @keyframes anime {
+      from {
+        border-width: 0;
+      }
+
+      to {
+        border-width: 10rem;
+      }
     }
   }
 
@@ -224,7 +224,7 @@
 }`,
   ];
 
-  for (let { cssText } of getComputedStyleRaw()) {
+  for (let { rule: { cssText } } of getComputedStyleRaw()) {
     cssText = cssText.trim();
     if (expectedOthers.includes(cssText))
       console.log(`✅OK: Rule correctly extracted:\n${cssText}\n`);
