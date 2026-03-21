@@ -41,7 +41,12 @@ async function cssRulesFallback(sheetOrCtxRule, e) {
   };
 }
 
-export async function GetComputedStyleRaw(SHEETS = document.styleSheets, getCssRules = cssRulesFallback) {
+export async function GetComputedStyleRaw(options = {}) {
+  let { sheets = document.styleSheets, getCssRules = cssRulesFallback, wait = 3000 } = options;
+
+  wait && await Promise.all([...document.head.querySelectorAll('link[rel="stylesheet"]')]
+    .filter(l => !l.sheet)
+    .map(l => new Promise(r => { l.onload = r; l.onerror = r; setTimeout(r, wait); })));
 
   async function getAllRules(sheets) {
 
@@ -108,7 +113,7 @@ export async function GetComputedStyleRaw(SHEETS = document.styleSheets, getCssR
     return acc;
   }
 
-  const { flatRules, layers, others } = await getAllRules([...SHEETS]);
+  const { flatRules, layers, others } = await getAllRules([...sheets]);
   const rulesSorted = prepRules(flatRules, [...layers, undefined]);
   const allRules = rulesSorted.filter(r =>
     (!r.media || matchMedia(r.media).matches) && (!r.supports || CSS.supports(r.supports)))
