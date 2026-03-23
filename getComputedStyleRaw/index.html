@@ -180,6 +180,16 @@
     margin-left: 3rem !important;
     margin-right: 3rem;
   }
+
+  /*pseudo check*/
+  .santa::after {
+    content: "🎅";
+    margin: 2rem;
+  }
+
+  div.santa {
+    margin: 1rem;
+  }
 </style>
 
 <span id=a class=a>a<span id=b class=b>b<span id=c class=c>c</span><span id=d class=d>d</span></span></span>
@@ -197,15 +207,17 @@
 
 <div class="layer-imp-test">Layer !important Inversion</div>
 
+<div class="santa">hello christmas</div>
+
 <script type="module">
   import { GetComputedStyleRaw } from "../getComputedStyleRaw.js";
   const getComputedStyleRaw = await GetComputedStyleRaw();
 
-  function test(el) {
-    const raw = getComputedStyleRaw(el);
+  function test(el, pseudo) {
+    const raw = getComputedStyleRaw(el, pseudo);
     if (!Object.keys(raw).length)
       return true;
-    const tmp = getComputedStyle(el);
+    const tmp = getComputedStyle(el, pseudo);
     const comp = {};
     const raw2 = {};
     for (let p in raw) {
@@ -234,4 +246,5 @@
 
   for (let el of document.querySelectorAll("div,span"))
     console.log(`${test(el) ? "✅OK" : "❌ERROR"}: ${el.innerText}\n`);
+  console.log(`${test(document.querySelector(".santa"), "::after") ? "✅OK" : "❌ERROR"}: .santa::after\n`);
 </script>
