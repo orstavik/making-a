@@ -98,13 +98,19 @@ export async function GetComputedStyleRaw(options = {}) {
 
   const PSEUDO = /(.*?)(::[a-z-]+|:(?:before|after|first-letter|first-line))((:[a-z-]+)*)$/i;
   function prepRules(allRules, layers) {
+    const dict = {};
     for (let r of allRules) {
-      const pseudo = r.rule.selectorText.match(PSEUDO);
-      r.pseudo = pseudo?.[2];
-      r.selector = pseudo ? pseudo[1] + (pseudo[3] || "") : r.rule.selectorText;
-      r.priority = ((layers.indexOf(r.layer) + 1) * 100_000_000) + specificity(r.selector);
+      const m = r.rule.selectorText.match(PSEUDO);
+      const pseudo = m?.[2] ?? "";
+      r.selector = m ? m[1] + (m[3] || "") : r.rule.selectorText;
+      (dict[pseudo] ??= []).push(r);
     }
-    return allRules.sort((a, b) => a.priority - b.priority);
+    for (let k in dict)
+      dict[k] = dict[k]
+        .filter(r => (!r.media || matchMedia(r.media).matches) && (!r.supports || CSS.supports(r.supports)))
+        .map(r => ({ ...r, priority: ((layers.indexOf(r.layer) + 1) * 100_000_000) + specificity(r.selector) }))
+        .sort((a, b) => a.priority - b.priority);
+    return dict;
   }
 
   function assignStyle(acc, style, layer = "<unlayered>") {
@@ -119,14 +125,7 @@ export async function GetComputedStyleRaw(options = {}) {
   }
 
   const { flatRules, layers, others } = await getAllRules([...sheets]);
-  //todo 1. split the top level , into separate rules.
-  //todo 2. then filter out the pseudo rules.
-  const rulesSorted = prepRules(flatRules, [...layers, undefined]);
-  const allRules = rulesSorted.filter(r =>
-    (!r.media || matchMedia(r.media).matches) && (!r.supports || CSS.supports(r.supports)))
-  const RULES = {};
-  for (let r of allRules)
-    (RULES[r.pseudo || ""] ??= []).push(r);
+  const RULES = prepRules(flatRules, [...layers, undefined]);
 
   return function getComputedStyleRaw(el, pseudo = "") {
     if (el == null)
