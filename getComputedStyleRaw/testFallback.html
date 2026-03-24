@@ -26,18 +26,17 @@
   }
 
   const urlRewriter = url => "https://offcors.2js-no.workers.dev/?url=" + url;
-  const getRaw = await GetComputedStyleRaw({ urlRewriter });
-  const others = getRaw().map(o => o.rule.cssText);
+  const { getComputedStyleRaw, others } = await GetComputedStyleRaw({ urlRewriter });
 
   const el = document.querySelector("div");
   const cs = window.getComputedStyle(el);
-  const raw = getRaw(el);
-  const body = getRaw(document.body);
-  const divBefore = getRaw(el, ":before");
+  const raw = getComputedStyleRaw(el);
+  const body = getComputedStyleRaw(document.body);
+  const divBefore = getComputedStyleRaw(el, ":before");
   debugger
   console.log(`${cs.fontFamily === raw.fontFamily ? "✅OK" : "❌ERROR"}: font-family\n`);
 
-  replaceStyle(others, { div: raw, body });
+  replaceStyle(others.map(o => o.rule.cssText), { div: raw, body });
 </script>
 
 <style>

@@ -13,10 +13,10 @@
     import { GetComputedStyleRaw } from "../getComputedStyleRaw.js";
 
     const urlRewriter = url => "https://offcors.2js-no.workers.dev/?url=" + url;
-    const getRaw = await GetComputedStyleRaw({ urlRewriter });
+    const { getComputedStyleRaw } = await GetComputedStyleRaw({ urlRewriter });
 
     const cs = window.getComputedStyle(document.body);
-    const raw = getRaw(document.body);
+    const raw = getComputedStyleRaw(document.body);
     console.log(`${cs.color === raw.color ? "✅OK" : "❌ERROR"}: color\n`);
     for (let sheet of document.styleSheets)
       sheet.ownerNode.remove();

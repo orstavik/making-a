@@ -115,21 +115,40 @@ export async function GetComputedStyleRaw(options = {}) {
       res.push(selector.slice(prev).trim());
       return res;
     }
-    return splitSelector(rule.rule.selectorText).map(selectorText => ({ ...rule, selectorText }));
+    return splitSelector(rule.rule.selectorText).map(selector => ({ ...rule, selector }));
   }
 
-  const PSEUDO = /(.*?)(::[a-z-]+|:(?:before|after|first-letter|first-line))((:[a-z-]+)*)$/i;
+  const PSEUDO = /(.*?)((::[a-z-]+|(:before|:after|:first-letter|:first-line))(:[a-z-]+)*)$/i;
+  function extractPseudo(selector) {
+    const m = selector.match(PSEUDO);
+    return m ?
+      { selector: m[1], pseudo: m[4] ? ":" + m[1] : m[1] } :
+      { selector, pseudo: "" };
+  }
+
+  function separateImportantNormalPropertis(r) {
+    let native = r.rule.style, important, normal;
+    for (let i = 0; i < native.length; i++) {
+      const p = native[i];
+      const camel = p.replace(/-([a-z])/g, g => g[1].toUpperCase());
+      const target = native.getPropertyPriority(p) ? (important ??= {}) : (normal ??= {});
+      target[camel] = native.getPropertyValue(p);
+    }
+    return { important, normal };
+  }
+
   function prepRules(allRules, layers) {
     const dict = {};
     allRules = allRules.flatMap(splitTopComma);
     for (let r of allRules) {
-      const m = r.selectorText.match(PSEUDO);
-      const pseudo = m?.[2] ?? "";
-      r.selector = m ? m[1] + (m[3] || "") : r.selectorText;
+      const { selector, pseudo } = extractPseudo(r.selector);
+      r.selector = selector;
       (dict[pseudo] ??= []).push(r);
     }
     for (let k in dict)
       dict[k] = dict[k]
+        //todo we filter on supports and media here. This is something that might cause issues in use later.
+        .map(r => ({ ...r, ...separateImportantNormalPropertis(r) }))
         .filter(r => (!r.media || matchMedia(r.media).matches) && (!r.supports || CSS.supports(r.supports)))
         .map(r => ({ ...r, priority: ((layers.indexOf(r.layer) + 1) * 100_000_000) + specificity(r.selector) }))
         .sort((a, b) => a.priority - b.priority);
@@ -138,9 +157,11 @@ export async function GetComputedStyleRaw(options = {}) {
 
   function assignStyle(acc, style, layer = "<unlayered>") {
     for (let p of style) {
+      //todo we need to do this once in the prep step.
       const camel = p.replace(/-([a-z])/g, g => g[1].toUpperCase());
       const value = style.getPropertyValue(p);
       const old = acc[camel];
+      //todo under two different tables. one for important and one for normal props.
       if (!old?.layer || (layer == old.layer && style.getPropertyPriority(p)))
         acc[camel] = { value, layer: style.getPropertyPriority(p) && layer };
     }
@@ -150,17 +171,22 @@ export async function GetComputedStyleRaw(options = {}) {
   const { flatRules, layers, others } = await getAllRules([...sheets]);
   const RULES = prepRules(flatRules, [...layers, undefined]);
 
-  return function getComputedStyleRaw(el, pseudo = "") {
-    if (el == null)
-      return others;
-    const res = assignStyle({}, el.style, undefined);
-    for (let r of RULES[pseudo] ?? [])
+  function getComputedStyleRaw(el, pseudo = "") {
+    if (!(el instanceof Element))
+      throw new TypeError("First argument must be an Element");
+    if (pseudo && !pseudo.startsWith("::"))
+      pseudo = ":" + pseudo;
+    const rules = RULES[pseudo] || [];
+    const res = {};
+    !pseudo && assignStyle(res, el.style, undefined);
+    for (let r of rules)
       if (el.matches(r.selector))
         assignStyle(res, r.rule.style, r.layer);
-    assignStyle(res, el.style, undefined);
+    !pseudo && assignStyle(res, el.style, undefined);
     for (let k in res)
       res[k] = res[k].value;
     return res;
   }
+  return { getComputedStyleRaw, rules: RULES, others };
 }
 //todo 2. fix the pseudoElement in getComputedStyle. Make sure that :before is normalized in the query and the table.
