@@ -211,7 +211,7 @@
 
 <script type="module">
   import { GetComputedStyleRaw } from "../getComputedStyleRaw.js";
-  const getComputedStyleRaw = await GetComputedStyleRaw();
+  const { getComputedStyleRaw, rules, others } = await GetComputedStyleRaw({ urlRewriter: url => "https://offcors.2js-no.workers.dev/?url=" + url });
 
   function test(el, pseudo) {
     const raw = getComputedStyleRaw(el, pseudo);
@@ -224,7 +224,12 @@
       comp[p] = tmp[p];
       raw2[p] = raw[p].endsWith("rem") ? raw[p].slice(0, -3) + "0px" : raw[p];
     }
-    return JSON.stringify(raw) != JSON.stringify(comp) && JSON.stringify(raw2) == JSON.stringify(comp);
+    const success = JSON.stringify(raw) != JSON.stringify(comp) && JSON.stringify(raw2) == JSON.stringify(comp);
+    if (!success) {
+      debugger;
+      getComputedStyleRaw(el, pseudo);
+    }
+    return success;
   }
 
   const expectedOthers = [
@@ -236,7 +241,7 @@
 }`,
   ];
 
-  for (let { rule: { cssText } } of getComputedStyleRaw()) {
+  for (let { rule: { cssText } } of others) {
     cssText = cssText.trim();
     if (expectedOthers.includes(cssText))
       console.log(`✅OK: Rule correctly extracted:\n${cssText}\n`);

@@ -20,29 +20,34 @@ function specificity(selector) {
   return calcExpr(s);
 }
 
-async function cssRulesFallback(sheetOrCtxRule, e) {
-  try {
-    return sheetOrCtxRule.cssRules;
-  } catch {
-    if (!sheetOrCtxRule.href)
-      return;
-    const txt = await fetch(sheetOrCtxRule.href).then(r => r.text());
-    const iframe = document.createElement("iframe");
-    iframe.style.display = "none";
-    document.body.appendChild(iframe);
-    const baseEl = iframe.ownerDocument.createElement("base");
-    baseEl.href = sheetOrCtxRule.href;
-    iframe.ownerDocument.head.appendChild(baseEl);
-    const styleEl = iframe.ownerDocument.createElement("style");
-    iframe.ownerDocument.head.appendChild(styleEl);
-    styleEl.textContent = txt;
-    document.body.removeChild(iframe);
-    return styleEl.sheet.cssRules;
+const cssRuleFallback = (urlRewriter) =>
+  async function cssRulesFallback(sheetOrCtxRule, e) {
+    try {
+      return sheetOrCtxRule.cssRules;
+    } catch {
+      const base = sheetOrCtxRule.href;
+      if (!base) return;
+      let txt = await fetch(urlRewriter(base)).then(r => r.text());
+      txt = txt.replace(
+        /(@import\s+(?:url\(\s*)?|url\(\s*)['"]?([^'"\)]+)['"]?(\s*\)?)/g,
+        (m, pre, url, post) => `${pre}"${new URL(url, base).href}"${post}`
+      );
+      const sheet = new CSSStyleSheet({ baseURL: sheetOrCtxRule.href });
+      try { sheet.replaceSync(txt); }
+      catch { await sheet.replace(txt); }
+      Object.defineProperty(sheet, "href", { value: sheetOrCtxRule.href });
+      return sheet.cssRules;
+    };
   };
-}
 
 export async function GetComputedStyleRaw(options = {}) {
-  let { sheets = document.styleSheets, getCssRules = cssRulesFallback, wait = 3000 } = options;
+  let {
+    sheets = document.styleSheets,
+    urlRewriter = undefined,
+    wait = 3000,
+  } = options;
+
+  const getCssRules = urlRewriter ? cssRuleFallback(urlRewriter) : s => s.cssRules;
 
   wait && await Promise.all([...document.head.querySelectorAll('link[rel="stylesheet"]')]
     .filter(l => !l.sheet)
@@ -91,46 +96,87 @@ export async function GetComputedStyleRaw(options = {}) {
     return { flatRules, layers, others };
   }
 
-  const PSEUDO = /(.*?)(::[a-z-]+)((:[a-z-]+)*)$/i;
-  function prepRules(allRules, layers) {
-    for (let r of allRules) {
-      const pseudo = r.rule.selectorText.match(PSEUDO);
-      r.pseudo = pseudo?.[2];
-      r.selector = pseudo ? pseudo[1] + (pseudo[3] || "") : r.rule.selectorText;
-      r.priority = ((layers.indexOf(r.layer) + 1) * 100_000_000) + specificity(r.selector);
+  function splitTopComma(rule) {
+    function splitSelector(selector) {
+      const res = [];
+      let prev = 0;
+      for (let i = 0, q = "", depth = 0; i < selector.length; i++) {
+        const c = selector[i];
+        if (q && c === q) q = "";
+        else if (q) continue;
+        else if (c === '"' || c === "'") q = c;
+        else if (c === "(") depth++;
+        else if (c === ")") depth--;
+        else if (c === "," && depth === 0) {
+          (res ??= []).push(selector.slice(prev, i).trim());
+          prev = i + 1;
+        }
+      }
+      res.push(selector.slice(prev).trim());
+      return res;
     }
-    return allRules.sort((a, b) => a.priority - b.priority);
+    return splitSelector(rule.rule.selectorText).map(selector => ({ ...rule, selector }));
   }
 
-  function assignStyle(acc, style, layer = "<unlayered>") {
-    for (let p of style) {
+  const PSEUDO = /(.*?)((::[a-z-]+)(:[a-z-]+)*)$/i;
+  function extractPseudo(selector) {
+    const m = selector.match(PSEUDO);
+    return m ?
+      { selector: m[1] || "*", pseudo: m[4] ? ":" + m[2] : m[2] } :
+      { selector, pseudo: "" };
+  }
+
+  function splitImportantAndNormalProps(native) {
+    let important, normal;
+    for (let i = 0; i < native.length; i++) {
+      const p = native[i];
+      const value = native.getPropertyValue(p);
       const camel = p.replace(/-([a-z])/g, g => g[1].toUpperCase());
-      const value = style.getPropertyValue(p);
-      const old = acc[camel];
-      if (!old?.layer || (layer == old.layer && style.getPropertyPriority(p)))
-        acc[camel] = { value, layer: style.getPropertyPriority(p) && layer };
+      native.getPropertyPriority(p) ?
+        (important ??= {})[camel] = value :
+        (normal ??= {})[camel] = value;
     }
-    return acc;
+    return { important, normal };
+  }
+
+  function prepRules(flatRules, layers) {
+    const normalRules = {};
+    const importantRules = {};
+    const allRules = {};
+    flatRules = flatRules.flatMap(splitTopComma);
+    for (let r of flatRules) {
+      const { selector, pseudo } = extractPseudo(r.selector);
+      r.selector = selector;
+      (allRules[pseudo] ??= []).push(r);
+    }
+    for (let k in allRules) {
+      allRules[k] = allRules[k]
+        //todo we filter on supports and media here. This is something that might cause issues in use later.
+        .filter(r => (!r.media || matchMedia(r.media).matches) && (!r.supports || CSS.supports(r.supports)))
+        .map(r => ({
+          ...r,
+          ...splitImportantAndNormalProps(r.rule.style),
+          priority: ((layers.indexOf(r.layer) + 1) * 100_000_000) + specificity(r.selector),
+          priorityImportant: ((layers.indexOf(r.layer) + 1) * -100_000_000) + specificity(r.selector),
+        }));
+      importantRules[k] = allRules[k].slice().filter(r => r.important).sort((a, b) => a.priorityImportant - b.priorityImportant);
+      normalRules[k] = allRules[k].slice().filter(r => r.normal).sort((a, b) => a.priority - b.priority);
+    }
+    return { normalRules, importantRules, allRules };
   }
 
   const { flatRules, layers, others } = await getAllRules([...sheets]);
-  const rulesSorted = prepRules(flatRules, [...layers, undefined]);
-  const allRules = rulesSorted.filter(r =>
-    (!r.media || matchMedia(r.media).matches) && (!r.supports || CSS.supports(r.supports)))
-  const RULES = {};
-  for (let r of allRules)
-    (RULES[r.pseudo || ""] ??= []).push(r);
+  const { normalRules, importantRules, allRules } = prepRules(flatRules, [...layers, undefined]);
 
-  return function getComputedStyleRaw(el, pseudo = "") {
-    if (el == null)
-      return others;
-    const res = assignStyle({}, el.style, undefined);
-    for (let r of RULES[pseudo] ?? [])
-      if (el.matches(r.selector))
-        assignStyle(res, r.rule.style, r.layer);
-    assignStyle(res, el.style, undefined);
-    for (let k in res)
-      res[k] = res[k].value;
-    return res;
+  function getComputedStyleRaw(el, pseudo = "") {
+    if (!(el instanceof Element))
+      throw new TypeError("First argument must be an Element");
+    if (pseudo && !pseudo.startsWith("::"))
+      pseudo = ":" + pseudo;
+    const rules = normalRules[pseudo]?.filter(r => el.matches(r.selector)).map(r => r.normal) ?? [];
+    const rulesImportant = importantRules[pseudo]?.filter(r => el.matches(r.selector)).map(r => r.important) ?? [];
+    const { normal = {}, important = {} } = !pseudo ? splitImportantAndNormalProps(el.style) : {};
+    return Object.assign(Object.create(null), ...rules, normal, ...rulesImportant, important);
   }
+  return { getComputedStyleRaw, others, allRules, normalRules, importantRules, layers };
 }

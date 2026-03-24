@@ -1,0 +1,44 @@
+<!-- since they are lacking crossorigin="anonymous", their .cssRules become cors protected. -->
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6/css/all.min.css">
+
+<style>
+  div {
+    font-family: 'Roboto', 'Times New Roman', Times, serif;
+    font-size: 3rem;
+    border-bottom: 2rem solid #0f0;
+  }
+</style>
+
+<i class="fa-solid fa-golf-ball"></i>
+<div>hello roboto</div>
+<script type="module">
+  import { GetComputedStyleRaw } from "../getComputedStyleRaw.js";
+
+  function replaceStyle(others, raw) {
+    document.head.querySelectorAll("style, link").forEach(s => s.remove());
+    const style = document.createElement("style");
+    let txt = others.join("");
+    for (let k in raw)
+      txt += `${k} {${Object.entries(raw[k]).map(([p, v]) => `${p.replaceAll(/([A-Z])/g, "-$1").toLowerCase()}: ${v};`).join(" ")} }`;
+    style.textContent = txt;
+    document.head.appendChild(style);
+  }
+
+  const urlRewriter = url => "https://offcors.2js-no.workers.dev/?url=" + url;
+  const { getComputedStyleRaw, others } = await GetComputedStyleRaw({ urlRewriter });
+
+  const el = document.querySelector("i");
+  const cs = window.getComputedStyle(el);
+  const raw = getComputedStyleRaw(el);
+  const iBefore = getComputedStyleRaw(el, ":before");
+  const body = getComputedStyleRaw(document.body);
+  console.log(`${cs.fontFamily === raw.fontFamily ? "✅OK" : "❌ERROR"}: font-family\n`);
+
+  replaceStyle(others.map(o => o.rule.cssText), { i: raw, body, ["i::before"]: iBefore });
+</script>
+
+<style>
+
+
+</style>

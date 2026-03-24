@@ -1,0 +1,29 @@
+<!-- CORS protected, tests the fallback. -->
+<link rel="stylesheet" href="https://news.ycombinator.com/news.css">
+
+<style>
+  body {
+    font-size: 3rem;
+  }
+</style>
+
+<body>
+  off cors you are grey
+  <script type="module">
+    import { GetComputedStyleRaw } from "../getComputedStyleRaw.js";
+
+    const urlRewriter = url => "https://offcors.2js-no.workers.dev/?url=" + url;
+    const { getComputedStyleRaw } = await GetComputedStyleRaw({ urlRewriter });
+
+    const cs = window.getComputedStyle(document.body);
+    const raw = getComputedStyleRaw(document.body);
+    console.log(`${cs.color === raw.color ? "✅OK" : "❌ERROR"}: color\n`);
+    for (let sheet of document.styleSheets)
+      sheet.ownerNode.remove();
+    document.head.insertAdjacentHTML("beforeend", `<style>
+  body {
+    ${Object.entries(raw).map(([prop, value]) => `${prop.replaceAll(/([A-Z])/g, "-$1").toLowerCase()}: ${value};`).join(" ")} 
+  }
+  </style>`);
+  </script>
+</body>
