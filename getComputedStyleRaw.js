@@ -168,6 +168,18 @@ export async function GetComputedStyleRaw(options = {}) {
   const { flatRules, layers, others } = await getAllRules([...sheets]);
   const { normalRules, importantRules, allRules } = prepRules(flatRules, [...layers, undefined]);
 
+  function ObjectAssignReverseNoOverwrite(...matchedRules) {
+    const res = Object.create(null);
+    for (let i = matchedRules.length - 1; i >= 0; i--) {
+      const keys = Object.keys(matchedRules[i]);
+      for (let j = keys.length - 1; j >= 0; j--) {
+        const k = keys[j];
+        res[k] ??= matchedRules[i][k];
+      }
+    }
+    return Object.fromEntries(Object.entries(res).reverse());
+  }
+
   function getComputedStyleRaw(el, pseudo = "") {
     if (!(el instanceof Element))
       throw new TypeError("First argument must be an Element");
@@ -176,7 +188,8 @@ export async function GetComputedStyleRaw(options = {}) {
     const rules = normalRules[pseudo]?.filter(r => el.matches(r.selector)).map(r => r.normal) ?? [];
     const rulesImportant = importantRules[pseudo]?.filter(r => el.matches(r.selector)).map(r => r.important) ?? [];
     const { normal = {}, important = {} } = !pseudo ? splitImportantAndNormalProps(el.style) : {};
-    return Object.assign(Object.create(null), ...rules, normal, ...rulesImportant, important);
+    return ObjectAssignReverseNoOverwrite(...rules, normal, ...rulesImportant, important);
+    // return Object.assign(Object.create(null), ...rules, normal, ...rulesImportant, important);  //unfortunately gets into trouble with  we want to do the thing above, but we get the wrong key sequence.
   }
   return { getComputedStyleRaw, others, allRules, normalRules, importantRules, layers };
 }
