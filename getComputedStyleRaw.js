@@ -97,23 +97,25 @@ export async function GetComputedStyleRaw(options = {}) {
   }
 
   function splitTopComma(rule) {
-    const selector = rule.rule.selectorText;
-    const res = [];
-    let prev = 0;
-    for (let i = 0, q = "", depth = 0; i < selector.length; i++) {
-      const c = selector[i];
-      if (q && c === q) q = "";
-      else if (q) continue;
-      else if (c === '"' || c === "'") q = c;
-      else if (c === "(") depth++;
-      else if (c === ")") depth--;
-      else if (c === "," && depth === 0) {
-        (res ??= []).push({ ...rule, selectorText: selector.slice(prev, i).trim() });
-        prev = i + 1;
+    function splitSelector(selector) {
+      const res = [];
+      let prev = 0;
+      for (let i = 0, q = "", depth = 0; i < selector.length; i++) {
+        const c = selector[i];
+        if (q && c === q) q = "";
+        else if (q) continue;
+        else if (c === '"' || c === "'") q = c;
+        else if (c === "(") depth++;
+        else if (c === ")") depth--;
+        else if (c === "," && depth === 0) {
+          (res ??= []).push(selector.slice(prev, i).trim());
+          prev = i + 1;
+        }
       }
+      res.push(selector.slice(prev).trim());
+      return res;
     }
-    res.push({ ...rule, selectorText: selector.slice(prev).trim() });
-    return res;
+    return splitSelector(rule.rule.selectorText).map(selectorText => ({ ...rule, selectorText }));
   }
 
   const PSEUDO = /(.*?)(::[a-z-]+|:(?:before|after|first-letter|first-line))((:[a-z-]+)*)$/i;
