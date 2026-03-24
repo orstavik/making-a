@@ -96,13 +96,34 @@ export async function GetComputedStyleRaw(options = {}) {
     return { flatRules, layers, others };
   }
 
+  function splitTopComma(rule) {
+    const selector = rule.rule.selectorText;
+    const res = [];
+    let prev = 0;
+    for (let i = 0, q = "", depth = 0; i < selector.length; i++) {
+      const c = selector[i];
+      if (q && c === q) q = "";
+      else if (q) continue;
+      else if (c === '"' || c === "'") q = c;
+      else if (c === "(") depth++;
+      else if (c === ")") depth--;
+      else if (c === "," && depth === 0) {
+        (res ??= []).push({ ...rule, selectorText: selector.slice(prev, i).trim() });
+        prev = i + 1;
+      }
+    }
+    res.push({ ...rule, selectorText: selector.slice(prev).trim() });
+    return res;
+  }
+
   const PSEUDO = /(.*?)(::[a-z-]+|:(?:before|after|first-letter|first-line))((:[a-z-]+)*)$/i;
   function prepRules(allRules, layers) {
     const dict = {};
+    allRules = allRules.flatMap(splitTopComma);
     for (let r of allRules) {
-      const m = r.rule.selectorText.match(PSEUDO);
+      const m = r.selectorText.match(PSEUDO);
       const pseudo = m?.[2] ?? "";
-      r.selector = m ? m[1] + (m[3] || "") : r.rule.selectorText;
+      r.selector = m ? m[1] + (m[3] || "") : r.selectorText;
       (dict[pseudo] ??= []).push(r);
     }
     for (let k in dict)
@@ -140,6 +161,4 @@ export async function GetComputedStyleRaw(options = {}) {
     return res;
   }
 }
-
-//todo 1. split the top level , into separate rules.
 //todo 2. fix the pseudoElement in getComputedStyle. Make sure that :before is normalized in the query and the table.
