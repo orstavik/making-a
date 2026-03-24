@@ -28,15 +28,14 @@
   const urlRewriter = url => "https://offcors.2js-no.workers.dev/?url=" + url;
   const { getComputedStyleRaw, others } = await GetComputedStyleRaw({ urlRewriter });
 
-  const el = document.querySelector("div");
+  const el = document.querySelector("i");
   const cs = window.getComputedStyle(el);
   const raw = getComputedStyleRaw(el);
+  const iBefore = getComputedStyleRaw(el, ":before");
   const body = getComputedStyleRaw(document.body);
-  const divBefore = getComputedStyleRaw(el, ":before");
-  debugger
   console.log(`${cs.fontFamily === raw.fontFamily ? "✅OK" : "❌ERROR"}: font-family\n`);
 
-  replaceStyle(others.map(o => o.rule.cssText), { div: raw, body });
+  replaceStyle(others.map(o => o.rule.cssText), { i: raw, body, ["i::before"]: iBefore });
 </script>
 
 <style>

@@ -118,11 +118,11 @@ export async function GetComputedStyleRaw(options = {}) {
     return splitSelector(rule.rule.selectorText).map(selector => ({ ...rule, selector }));
   }
 
-  const PSEUDO = /(.*?)((::[a-z-]+|(:before|:after|:first-letter|:first-line))(:[a-z-]+)*)$/i;
+  const PSEUDO = /(.*?)((::[a-z-]+)(:[a-z-]+)*)$/i;
   function extractPseudo(selector) {
     const m = selector.match(PSEUDO);
     return m ?
-      { selector: m[1], pseudo: m[4] ? ":" + m[1] : m[1] } :
+      { selector: m[1] || "*", pseudo: m[4] ? ":" + m[2] : m[2] } :
       { selector, pseudo: "" };
   }
 
@@ -130,9 +130,11 @@ export async function GetComputedStyleRaw(options = {}) {
     let important, normal;
     for (let i = 0; i < native.length; i++) {
       const p = native[i];
+      const value = native.getPropertyValue(p);
       const camel = p.replace(/-([a-z])/g, g => g[1].toUpperCase());
-      const target = native.getPropertyPriority(p) ? (important ??= {}) : (normal ??= {});
-      target[camel] = native.getPropertyValue(p);
+      native.getPropertyPriority(p) ?
+        (important ??= {})[camel] = value :
+        (normal ??= {})[camel] = value;
     }
     return { important, normal };
   }
