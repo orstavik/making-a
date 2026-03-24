@@ -138,21 +138,28 @@ export async function GetComputedStyleRaw(options = {}) {
   }
 
   function prepRules(allRules, layers) {
-    const dict = {};
+    const normal = {};
+    const important = {};
     allRules = allRules.flatMap(splitTopComma);
     for (let r of allRules) {
       const { selector, pseudo } = extractPseudo(r.selector);
       r.selector = selector;
-      (dict[pseudo] ??= []).push(r);
+      (normal[pseudo] ??= []).push(r);
     }
-    for (let k in dict)
-      dict[k] = dict[k]
+    for (let k in normal) {
+      const rules = normal[k]
         //todo we filter on supports and media here. This is something that might cause issues in use later.
         .map(r => ({ ...r, ...separateImportantNormalPropertis(r) }))
         .filter(r => (!r.media || matchMedia(r.media).matches) && (!r.supports || CSS.supports(r.supports)))
-        .map(r => ({ ...r, priority: ((layers.indexOf(r.layer) + 1) * 100_000_000) + specificity(r.selector) }))
-        .sort((a, b) => a.priority - b.priority);
-    return dict;
+        .map(r => ({
+          ...r,
+          priority: ((layers.indexOf(r.layer) + 1) * 100_000_000) + specificity(r.selector),
+          priorityImportant: ((layers.indexOf(r.layer) + 1) * -100_000_000) + specificity(r.selector),
+        }));
+      important[k] = [...rules].sort((a, b) => a.priorityImportant - b.priorityImportant);
+      normal[k] = rules.sort((a, b) => a.priority - b.priority);
+    }
+    return { normal, important };
   }
 
   function assignStyle(acc, style, layer = "<unlayered>") {
@@ -169,14 +176,14 @@ export async function GetComputedStyleRaw(options = {}) {
   }
 
   const { flatRules, layers, others } = await getAllRules([...sheets]);
-  const RULES = prepRules(flatRules, [...layers, undefined]);
+  const { normal } = prepRules(flatRules, [...layers, undefined]);
 
   function getComputedStyleRaw(el, pseudo = "") {
     if (!(el instanceof Element))
       throw new TypeError("First argument must be an Element");
     if (pseudo && !pseudo.startsWith("::"))
       pseudo = ":" + pseudo;
-    const rules = RULES[pseudo] || [];
+    const rules = normal[pseudo] || [];
     const res = {};
     !pseudo && assignStyle(res, el.style, undefined);
     for (let r of rules)
@@ -187,6 +194,6 @@ export async function GetComputedStyleRaw(options = {}) {
       res[k] = res[k].value;
     return res;
   }
-  return { getComputedStyleRaw, rules: RULES, others };
+  return { getComputedStyleRaw, rules: normal, others };
 }
 //todo 2. fix the pseudoElement in getComputedStyle. Make sure that :before is normalized in the query and the table.
