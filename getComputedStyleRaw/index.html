@@ -211,7 +211,7 @@
 
 <script type="module">
   import { GetComputedStyleRaw } from "../getComputedStyleRaw.js";
-  const getComputedStyleRaw = await GetComputedStyleRaw();
+  const getComputedStyleRaw = await GetComputedStyleRaw({ urlRewriter: url => "https://offcors.2js-no.workers.dev/?url=" + url });
 
   function test(el, pseudo) {
     const raw = getComputedStyleRaw(el, pseudo);

@@ -20,29 +20,34 @@ function specificity(selector) {
   return calcExpr(s);
 }
 
-async function cssRulesFallback(sheetOrCtxRule, e) {
-  try {
-    return sheetOrCtxRule.cssRules;
-  } catch {
-    if (!sheetOrCtxRule.href)
-      return;
-    const txt = await fetch(sheetOrCtxRule.href).then(r => r.text());
-    const iframe = document.createElement("iframe");
-    iframe.style.display = "none";
-    document.body.appendChild(iframe);
-    const baseEl = iframe.ownerDocument.createElement("base");
-    baseEl.href = sheetOrCtxRule.href;
-    iframe.ownerDocument.head.appendChild(baseEl);
-    const styleEl = iframe.ownerDocument.createElement("style");
-    iframe.ownerDocument.head.appendChild(styleEl);
-    styleEl.textContent = txt;
-    document.body.removeChild(iframe);
-    return styleEl.sheet.cssRules;
+const cssRuleFallback = (urlRewriter) =>
+  async function cssRulesFallback(sheetOrCtxRule, e) {
+    try {
+      return sheetOrCtxRule.cssRules;
+    } catch {
+      const base = sheetOrCtxRule.href;
+      if (!base) return;
+      let txt = await fetch(urlRewriter(base)).then(r => r.text());
+      txt = txt.replace(
+        /(@import\s+(?:url\(\s*)?|url\(\s*)['"]?([^'"\)]+)['"]?(\s*\)?)/g,
+        (m, pre, url, post) => `${pre}"${new URL(url, base).href}"${post}`
+      );
+      const sheet = new CSSStyleSheet({ baseURL: sheetOrCtxRule.href });
+      try { sheet.replaceSync(txt); }
+      catch { await sheet.replace(txt); }
+      Object.defineProperty(sheet, "href", { value: sheetOrCtxRule.href });
+      return sheet.cssRules;
+    };
   };
-}
 
 export async function GetComputedStyleRaw(options = {}) {
-  let { sheets = document.styleSheets, getCssRules = cssRulesFallback, wait = 3000 } = options;
+  let {
+    sheets = document.styleSheets,
+    urlRewriter = undefined,
+    wait = 3000,
+  } = options;
+
+  const getCssRules = urlRewriter ? cssRuleFallback(urlRewriter) : s => s.cssRules;
 
   wait && await Promise.all([...document.head.querySelectorAll('link[rel="stylesheet"]')]
     .filter(l => !l.sheet)
@@ -91,7 +96,7 @@ export async function GetComputedStyleRaw(options = {}) {
     return { flatRules, layers, others };
   }
 
-  const PSEUDO = /(.*?)(::[a-z-]+)((:[a-z-]+)*)$/i;
+  const PSEUDO = /(.*?)(::[a-z-]+|:(?:before|after|first-letter|first-line))((:[a-z-]+)*)$/i;
   function prepRules(allRules, layers) {
     for (let r of allRules) {
       const pseudo = r.rule.selectorText.match(PSEUDO);
@@ -114,6 +119,8 @@ export async function GetComputedStyleRaw(options = {}) {
   }
 
   const { flatRules, layers, others } = await getAllRules([...sheets]);
+  //todo 1. split the top level , into separate rules.
+  //todo 2. then filter out the pseudo rules.
   const rulesSorted = prepRules(flatRules, [...layers, undefined]);
   const allRules = rulesSorted.filter(r =>
     (!r.media || matchMedia(r.media).matches) && (!r.supports || CSS.supports(r.supports)))
@@ -134,3 +141,6 @@ export async function GetComputedStyleRaw(options = {}) {
     return res;
   }
 }
+
+//todo 1. split the top level , into separate rules.
+//todo 2. fix the pseudoElement in getComputedStyle. Make sure that :before is normalized in the query and the table.
