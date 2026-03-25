@@ -1,0 +1,29 @@
+<style>
+  :root {
+    --bob: rgb(0, 0, 255);
+  }
+
+  body {
+    color: var(--bob, red);
+  }
+</style>
+
+<body>
+  bob is YOUR uncle
+  <script type="module">
+    import { GetComputedStyleRaw } from "../getComputedStyleRaw.js";
+
+    const { getComputedStyleRaw } = await GetComputedStyleRaw();
+
+    const cs = window.getComputedStyle(document.body);
+    const raw = getComputedStyleRaw(document.body);
+    console.log(`${cs.color === raw.color ? "✅OK" : "❌ERROR"}: color\n`);
+    for (let sheet of document.styleSheets)
+      sheet.ownerNode.remove();
+    document.head.insertAdjacentHTML("beforeend", `<style>
+  body {
+    ${Object.entries(raw).map(([prop, value]) => `${prop.replaceAll(/([A-Z])/g, "-$1").toLowerCase()}: ${value};`).join(" ")} 
+  }
+  </style>`);
+  </script>
+</body>

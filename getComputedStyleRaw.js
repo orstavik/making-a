@@ -1,3 +1,29 @@
+function resolveCssVariables(str, getCssVariableFn) {
+  const CssVar = /var\(\s*(--[\w-]+)\s*/;
+
+  for (let m, i = 100; m = str.match(CssVar);) {
+    if (!--i) return "unset"; //circular reference or 100 nested vars() => unset.
+    let [full, varName] = m;
+    for (let j = m.index + full.length, depth = 0; j < str.length; j++) {
+      let fallback;
+      if (str[j] === "(")
+        depth++;
+      else if (str[j] === ")" && depth)
+        depth--;
+      else if (str[j] === ")") {
+        fallback = str.slice(m.index + full.length + 1, j).trim();
+        full = str.slice(m.index, j + 1);
+        break;
+      }
+    }
+    const value = getCssVariableFn(varName) ?? fallback;
+    if (value == null)
+      return "unset";
+    str = str.replaceAll(full, value);
+  }
+  return str;
+}
+
 function specificity(selector) {
   const QuoteRX = /(["'])(?:(?=(\\?))\2.)*?\1/gi;
   const ClassRX = /(\.[^\s()#.[\]>+~*,:"']+|\[[^\]]*\]|:(?!(is|not|has|where))[\w-]+(\([^)(]*\))?)/gi;
@@ -45,6 +71,7 @@ export async function GetComputedStyleRaw(options = {}) {
     sheets = document.styleSheets,
     urlRewriter = undefined,
     wait = 3000,
+    getCssVariableFn,
   } = options;
 
   const getCssRules = urlRewriter ? cssRuleFallback(urlRewriter) : s => s.cssRules;
@@ -168,13 +195,26 @@ export async function GetComputedStyleRaw(options = {}) {
   const { flatRules, layers, others } = await getAllRules([...sheets]);
   const { normalRules, importantRules, allRules } = prepRules(flatRules, [...layers, undefined]);
 
-  function ObjectAssignReverseNoOverwrite(...matchedRules) {
+  const tmpEl = document.createElement("div");
+  function ObjectAssignReverseNoOverwrite(getCssVariableFn, ...matchedRules) {
     const res = Object.create(null);
     for (let i = matchedRules.length - 1; i >= 0; i--) {
       const keys = Object.keys(matchedRules[i]);
       for (let j = keys.length - 1; j >= 0; j--) {
         const k = keys[j];
-        res[k] ??= matchedRules[i][k];
+        if (k in res) continue;
+        const value = matchedRules[i][k];
+        const resolvedValue = value.includes("var(") ? resolveCssVariables(value, getCssVariableFn) : value;
+        if (value === resolvedValue) {
+          res[k] = value;
+          continue;
+        }
+        tmpEl.style[k] = resolvedValue;
+        for (let p of tmpEl.style) {
+          let camel = p.replace(/-([a-z])/g, (_, c) => c.toUpperCase());
+          if (!(camel in res))
+            res[camel] = tmpEl.style.getPropertyValue(p);
+        }
       }
     }
     return Object.fromEntries(Object.entries(res).reverse());
@@ -188,7 +228,8 @@ export async function GetComputedStyleRaw(options = {}) {
     const rules = normalRules[pseudo]?.filter(r => el.matches(r.selector)).map(r => r.normal) ?? [];
     const rulesImportant = importantRules[pseudo]?.filter(r => el.matches(r.selector)).map(r => r.important) ?? [];
     const { normal = {}, important = {} } = !pseudo ? splitImportantAndNormalProps(el.style) : {};
-    return ObjectAssignReverseNoOverwrite(...rules, normal, ...rulesImportant, important);
+    const getCssVar = getCssVariableFn ?? (p => getComputedStyle(el).getPropertyValue(p));
+    return ObjectAssignReverseNoOverwrite(getCssVar, ...rules, normal, ...rulesImportant, important);
     // return Object.assign(Object.create(null), ...rules, normal, ...rulesImportant, important);  //unfortunately gets into trouble with  we want to do the thing above, but we get the wrong key sequence.
   }
   return { getComputedStyleRaw, others, allRules, normalRules, importantRules, layers };
