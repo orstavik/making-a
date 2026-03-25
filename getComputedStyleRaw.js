@@ -4,8 +4,8 @@ function resolveCssVariables(str, getCssVariableFn) {
   for (let m, i = 100; m = str.match(CssVar);) {
     if (!--i) return "unset"; //circular reference or 100 nested vars() => unset.
     let [full, varName] = m;
+    let fallback;
     for (let j = m.index + full.length, depth = 0; j < str.length; j++) {
-      let fallback;
       if (str[j] === "(")
         depth++;
       else if (str[j] === ")" && depth)
@@ -71,7 +71,6 @@ export async function GetComputedStyleRaw(options = {}) {
     sheets = document.styleSheets,
     urlRewriter = undefined,
     wait = 3000,
-    getCssVariableFn,
   } = options;
 
   const getCssRules = urlRewriter ? cssRuleFallback(urlRewriter) : s => s.cssRules;
@@ -158,10 +157,10 @@ export async function GetComputedStyleRaw(options = {}) {
     for (let i = 0; i < native.length; i++) {
       const p = native[i];
       const value = native.getPropertyValue(p);
-      const camel = p.replace(/-([a-z])/g, g => g[1].toUpperCase());
+      // const camel = p.replace(/-([a-z])/g, g => g[1].toUpperCase());
       native.getPropertyPriority(p) ?
-        (important ??= {})[camel] = value :
-        (normal ??= {})[camel] = value;
+        (important ??= {})[p] = value :
+        (normal ??= {})[p] = value;
     }
     return { important, normal };
   }
@@ -204,23 +203,21 @@ export async function GetComputedStyleRaw(options = {}) {
         const k = keys[j];
         if (k in res) continue;
         const value = matchedRules[i][k];
-        const resolvedValue = value.includes("var(") ? resolveCssVariables(value, getCssVariableFn) : value;
-        if (value === resolvedValue) {
+        const resolvedValue = resolveCssVariables?.(value, getCssVariableFn) ?? value;
+        if (value === resolvedValue)
           res[k] = value;
-          continue;
-        }
-        tmpEl.style[k] = resolvedValue;
-        for (let p of tmpEl.style) {
-          let camel = p.replace(/-([a-z])/g, (_, c) => c.toUpperCase());
-          if (!(camel in res))
-            res[camel] = tmpEl.style.getPropertyValue(p);
+        else {
+          tmpEl.style = `${k}: ${resolvedValue};`; //resets all previous properties first.
+          for (let p of tmpEl.style)
+            if (!(p in res))
+              res[p] = tmpEl.style.getPropertyValue(p);
         }
       }
     }
     return Object.fromEntries(Object.entries(res).reverse());
   }
 
-  function getComputedStyleRaw(el, pseudo = "") {
+  function getComputedStyleRaw(el, pseudo = "", getCssVariableFn = (p => getComputedStyle(el).getPropertyValue(p))) {
     if (!(el instanceof Element))
       throw new TypeError("First argument must be an Element");
     if (pseudo && !pseudo.startsWith("::"))
@@ -228,8 +225,7 @@ export async function GetComputedStyleRaw(options = {}) {
     const rules = normalRules[pseudo]?.filter(r => el.matches(r.selector)).map(r => r.normal) ?? [];
     const rulesImportant = importantRules[pseudo]?.filter(r => el.matches(r.selector)).map(r => r.important) ?? [];
     const { normal = {}, important = {} } = !pseudo ? splitImportantAndNormalProps(el.style) : {};
-    const getCssVar = getCssVariableFn ?? (p => getComputedStyle(el).getPropertyValue(p));
-    return ObjectAssignReverseNoOverwrite(getCssVar, ...rules, normal, ...rulesImportant, important);
+    return ObjectAssignReverseNoOverwrite(getCssVariableFn, ...rules, normal, ...rulesImportant, important);
     // return Object.assign(Object.create(null), ...rules, normal, ...rulesImportant, important);  //unfortunately gets into trouble with  we want to do the thing above, but we get the wrong key sequence.
   }
   return { getComputedStyleRaw, others, allRules, normalRules, importantRules, layers };
