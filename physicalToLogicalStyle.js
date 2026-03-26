@@ -9,24 +9,24 @@ const nonLogical = {
   'rtl|sideways-lr': { top: "inline-start", left: "block-start", right: "block-end", bottom: "inline-end" },
 };
 const nonLogicalRadius = {
-  'sideways-lr': { "top-left": "start-start", "top-right": "end-start", "bottom-left": "start-end", "bottom-right": "end-end" },
   'horizontal-tb': { "top-left": "start-start", "top-right": "start-end", "bottom-left": "end-start", "bottom-right": "end-end", },
   'vertical-rl': { "top-left": "end-start", "top-right": "start-start", "bottom-left": "end-end", "bottom-right": "start-end", },
   'vertical-lr': { "top-left": "start-start", "top-right": "end-start", "bottom-left": "start-end", "bottom-right": "end-end", },
-  'rtl|horizontal-tb': { "top-left": "start-end", "top-right": "start-start", "bottom-left": "end-end", "bottom-right": "end-start" },
-  'rtl|vertical-rl': { "top-left": "end-end", "top-right": "start-end", "bottom-left": "end-start", "bottom-right": "start-start" },
-  'rtl|vertical-lr': { "top-left": "start-end", "top-right": "end-end", "bottom-left": "start-start", "bottom-right": "end-start" },
-  'rtl|sideways-lr': { "top-left": "start-end", "top-right": "end-end", "bottom-left": "start-start", "bottom-right": "end-start", },
+  'sideways-lr': { "top-left": "start-end", "top-right": "end-end", "bottom-left": "start-start", "bottom-right": "end-start", },
+  'rtl|horizontal-tb': { "top-left": "start-end", "top-right": "start-start", "bottom-left": "end-end", "bottom-right": "end-start", },
+  'rtl|vertical-rl': { "top-left": "end-end", "top-right": "start-end", "bottom-left": "end-start", "bottom-right": "start-start", },
+  'rtl|vertical-lr': { "top-left": "start-end", "top-right": "end-end", "bottom-left": "start-start", "bottom-right": "end-start", },
+  'rtl|sideways-lr': { "top-left": "start-start", "top-right": "end-start", "bottom-left": "start-end", "bottom-right": "end-end", },
 };
 const nonLogicalDirections = {
-  'sideways-lr': { x: "inline", y: "block", },
-  'horizontal-tb': { x: "block", y: "inline", },
+  'sideways-lr': { x: "block", y: "inline", },
+  'horizontal-tb': { x: "inline", y: "block", },
   'vertical-rl': { x: "block", y: "inline", },
-  'vertical-lr': { x: "inline", y: "block", },
+  'vertical-lr': { x: "block", y: "inline", },
   'rtl|horizontal-tb': { x: "inline", y: "block", },
   'rtl|vertical-rl': { x: "block", y: "inline", },
   'rtl|vertical-lr': { x: "block", y: "inline", },
-  'rtl|sideways-lr': { x: "inline", y: "block", },
+  'rtl|sideways-lr': { x: "block", y: "inline", },
 };
 const PhysicalToLogicalValues = {};
 for (let [n, t] of Object.entries(nonLogicalDirections))
@@ -45,7 +45,8 @@ function makeLogicalValue(k, v, map) {
 
 const PhysicalToLogical = {};
 for (const [writingMode, table] of Object.entries(nonLogical)) {
-  PhysicalToLogicalValues[writingMode] = { ...nonLogicalDirections[writingMode], ...table };
+  const dir = nonLogicalDirections[writingMode];
+  PhysicalToLogicalValues[writingMode] = { ...dir, horizontal: dir.x, vertical: dir.y, ...table };
   const res = PhysicalToLogical[writingMode] = {};
   for (const [physical, logical] of Object.entries(table)) {
     res[physical] = "inset-" + logical;
@@ -60,7 +61,7 @@ for (const [writingMode, table] of Object.entries(nonLogical)) {
 PhysicalToLogical["sideways-rl"] = PhysicalToLogical["vertical-rl"];
 
 export function physicalToLogicalCss(styles) {
-  const writingMode = styles["writing-mode"] ?? "horizontal-tb";
+  const writingMode = (styles.direction === "rtl" ? "rtl|" : "") + (styles["writing-mode"] ?? "horizontal-tb");
   const map = PhysicalToLogical[writingMode];
   const valueMap = PhysicalToLogicalValues[writingMode];
   const res = {};
