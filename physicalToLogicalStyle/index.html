@@ -1,0 +1,39 @@
+<pre id="one" style="border: 2px solid rgb(255,0,0); writing-mode: horizontal-tb;">{
+  "border-block-start-color": "rgb(255, 0, 0)",
+  "border-block-start-style": "solid",
+  "border-block-start-width": "2px",
+  "border-inline-start-color": "rgb(255, 0, 0)",
+  "border-inline-start-style": "solid",
+  "border-inline-start-width": "2px",
+  "border-block-end-color": "rgb(255, 0, 0)",
+  "border-block-end-style": "solid",
+  "border-block-end-width": "2px",
+  "border-inline-end-color": "rgb(255, 0, 0)",
+  "border-inline-end-style": "solid",
+  "border-inline-end-width": "2px"
+}</pre>
+<pre id="two" style="padding: 1px 2px 3px 4px; writing-mode: vertical-rl;">{
+  "padding-block-start": "2px",
+  "padding-block-end": "4px",
+  "padding-inline-start": "1px",
+  "padding-inline-end": "3px"
+}</pre>
+<pre id="three" style="float: left; writing-mode: sideways-lr;">{ "float": "block-start" }</pre>
+<pre id="four" style="text-align: right; writing-mode: vertical-lr;">{ "text-align": "end" }</pre>
+
+<script type="module">
+  import { physicalToLogicalCss } from "../physicalToLogicalStyle.js";
+
+  function test(el) {
+    const style = {};
+    for (let p of el.style)
+      style[p] = el.style[p];
+    const logicalStyle = physicalToLogicalCss(style);
+    const expected = JSON.parse(el.textContent.trim());
+    const misMatch = Object.entries(expected).find(([k, v]) => logicalStyle[k] !== v);
+    console.log(`${misMatch ? `❌ERROR: ${misMatch[0]} (expected: ${misMatch[1]}, got: ${logicalStyle[misMatch[0]]})` : "✅OK"}: ${el.id}`);
+  }
+
+  for (let pre of document.querySelectorAll("pre"))
+    test(pre);
+</script>
