@@ -16,7 +16,7 @@
     const { getComputedStyleRaw } = await GetComputedStyleRaw();
 
     const cs = window.getComputedStyle(document.body);
-    const raw = getComputedStyleRaw(document.body);
+    const raw = getComputedStyleRaw(document.body, undefined, name => cs.getPropertyValue(name));
     console.log(`${cs.color === raw.color ? "✅OK" : "❌ERROR"}: color\n`);
     for (let sheet of document.styleSheets)
       sheet.ownerNode.remove();

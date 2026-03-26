@@ -203,7 +203,7 @@ export async function GetComputedStyleRaw(options = {}) {
         const k = keys[j];
         if (k in res) continue;
         const value = matchedRules[i][k];
-        const resolvedValue = resolveCssVariables?.(value, getCssVariableFn) ?? value;
+        const resolvedValue = getCssVariableFn ? resolveCssVariables(value, getCssVariableFn) : value;
         if (value === resolvedValue)
           res[k] = value;
         else {
@@ -217,9 +217,11 @@ export async function GetComputedStyleRaw(options = {}) {
     return Object.fromEntries(Object.entries(res).reverse());
   }
 
-  function getComputedStyleRaw(el, pseudo = "", getCssVariableFn = (p => getComputedStyle(el).getPropertyValue(p))) {
+  function getComputedStyleRaw(el, pseudo = "", getCssVariableFn) {
     if (!(el instanceof Element))
       throw new TypeError("First argument must be an Element");
+    if (getCssVariableFn && typeof getCssVariableFn !== "function")
+      getCssVariableFn = p => getComputedStyle(el).getPropertyValue(p);
     if (pseudo && !pseudo.startsWith("::"))
       pseudo = ":" + pseudo;
     const rules = normalRules[pseudo]?.filter(r => el.matches(r.selector)).map(r => r.normal) ?? [];

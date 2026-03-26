@@ -30,10 +30,10 @@
 
   const el = document.querySelector("i");
   const cs = window.getComputedStyle(el);
-  const raw = getComputedStyleRaw(el);
+  const raw = getComputedStyleRaw(el, undefined, true);
   const iBefore = getComputedStyleRaw(el, ":before");
   const body = getComputedStyleRaw(document.body);
-  console.log(`${cs.fontFamily === raw.fontFamily ? "✅OK" : "❌ERROR"}: font-family\n`);
+  console.log(`${cs["font-family"] === raw["font-family"] ? "✅OK" : "❌ERROR"}: font-family\n`);
 
   replaceStyle(others.map(o => o.rule.cssText), { i: raw, body, ["i::before"]: iBefore });
 </script>
