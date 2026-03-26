@@ -1,0 +1,105 @@
+<pre id="border_color_horiz"
+  style="border-top-color: red; border-left-color: blue; border-bottom-color: green; border-right-color: yellow; writing-mode: horizontal-tb;">{
+  "border-block-start-color": "red",
+  "border-inline-start-color": "blue",
+  "border-block-end-color": "green",
+  "border-inline-end-color": "yellow",
+  "writing-mode": "horizontal-tb"
+}</pre>
+<pre id="padding_vert_rl"
+  style="padding-top: 1px; padding-right: 2px; padding-bottom: 3px; padding-left: 4px; writing-mode: vertical-rl;">{
+  "padding-inline-start": "1px",
+  "padding-block-start": "2px",
+  "padding-inline-end": "3px",
+  "padding-block-end": "4px",
+  "writing-mode": "vertical-rl"
+}</pre>
+<pre id="float_sideways_lr" style="float: left; writing-mode: sideways-lr;">{
+  "float": "block-start",
+  "writing-mode": "sideways-lr"
+}</pre>
+<pre id="text_align_vert_lr" style="text-align: right; writing-mode: vertical-lr;">{
+  "text-align": "end",
+  "writing-mode": "vertical-lr"
+}</pre>
+<pre id="margin_rtl_horiz" style="margin-top: 10px; margin-left: 20px; direction: rtl; writing-mode: horizontal-tb;">{
+  "margin-block-start": "10px",
+  "margin-inline-end": "20px",
+  "direction": "rtl",
+  "writing-mode": "horizontal-tb"
+}</pre>
+<pre id="resize_vert_rl" style="resize: horizontal; writing-mode: vertical-rl;">{
+  "resize": "block",
+  "writing-mode": "vertical-rl"
+}</pre>
+<pre id="border_radius_sideways_lr"
+  style="border-top-left-radius: 5px; border-bottom-right-radius: 10px; writing-mode: sideways-lr;">{
+  "border-start-end-radius": "5px",
+  "border-end-start-radius": "10px",
+  "writing-mode": "sideways-lr"
+}</pre>
+<pre id="clear_rtl_vert_lr" style="clear: right; direction: rtl; writing-mode: vertical-lr;">{
+  "clear": "block-end",
+  "direction": "rtl",
+  "writing-mode": "vertical-lr"
+}</pre>
+<pre id="scroll_margin_horiz" style="scroll-margin-top: 10px; writing-mode: horizontal-tb;">{
+  "scroll-margin-block-start": "10px",
+  "writing-mode": "horizontal-tb"
+}</pre>
+<pre id="caption_side_vert_rl" style="caption-side: bottom; writing-mode: vertical-rl;">{
+  "caption-side": "inline-end",
+  "writing-mode": "vertical-rl"
+}</pre>
+<pre id="scroll_snap_type_sideways_lr" style="scroll-snap-type: x mandatory; writing-mode: sideways-lr;">{
+  "scroll-snap-type": "block mandatory",
+  "writing-mode": "sideways-lr"
+}</pre>
+<pre id="border_color_rtl_horiz"
+  style="border-top-color: red; border-left-color: blue; direction: rtl; writing-mode: horizontal-tb;">{
+  "border-block-start-color": "red",
+  "border-inline-end-color": "blue",
+  "direction": "rtl",
+  "writing-mode": "horizontal-tb"
+}</pre>
+<pre id="border_style_vert_lr" style="border-bottom-style: dashed; writing-mode: vertical-lr;">{
+  "border-inline-end-style": "dashed",
+  "writing-mode": "vertical-lr"
+}</pre>
+<pre id="border_width_rtl_vert_rl" style="border-right-width: 2px; direction: rtl; writing-mode: vertical-rl;">{
+  "border-block-start-width": "2px",
+  "direction": "rtl",
+  "writing-mode": "vertical-rl"
+}</pre>
+<pre id="inset_rtl_sideways_lr"
+  style="top: 10px; left: 20px; bottom: 30px; right: 40px; direction: rtl; writing-mode: sideways-lr;">{
+  "inset-inline-start": "10px",
+  "inset-block-start": "20px",
+  "inset-inline-end": "30px",
+  "inset-block-end": "40px",
+  "direction": "rtl",
+  "writing-mode": "sideways-lr"
+}</pre>
+
+<script type="module">
+  import { cssPhysicalToLogical } from "../cssPhysicalToLogical.js";
+
+  function test(el) {
+    const style = {};
+    for (let p of el.style) {
+      if (el.style[p]) style[p] = el.style[p];
+    }
+    const logicalStyle = cssPhysicalToLogical(style);
+    const expected = JSON.parse(el.textContent.trim());
+    const [misKey, misValue] = Object.entries(expected).find(([k, v]) => logicalStyle[k] !== v) || [];
+    if (misKey) {
+      console.log(`❌ERROR ${el.id}: ${misKey} (expected: ${misValue}, got: ${logicalStyle[misKey]})`);
+      debugger;
+      cssPhysicalToLogical(style);
+    } else
+      console.log(`✅OK ${el.id}`);
+  }
+
+  for (let pre of document.querySelectorAll("pre"))
+    test(pre);
+</script>
