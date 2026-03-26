@@ -58,7 +58,7 @@ for (const [writingMode, table] of Object.entries(nonLogical)) {
 };
 PhysicalToLogical["sideways-rl"] = PhysicalToLogical["vertical-rl"];
 
-export function physicalToLogicalCss(styles) {
+export function cssPhysicalToLogical(styles) {
   const writingMode = (styles.direction === "rtl" ? "rtl|" : "") + (styles["writing-mode"] ?? "horizontal-tb");
   const map = PhysicalToLogical[writingMode];
   const valueMap = PhysicalToLogicalValues[writingMode];

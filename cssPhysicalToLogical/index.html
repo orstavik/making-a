@@ -82,20 +82,20 @@
 }</pre>
 
 <script type="module">
-  import { physicalToLogicalCss } from "../physicalToLogicalStyle.js";
+  import { cssPhysicalToLogical } from "../cssPhysicalToLogical.js";
 
   function test(el) {
     const style = {};
     for (let p of el.style) {
       if (el.style[p]) style[p] = el.style[p];
     }
-    const logicalStyle = physicalToLogicalCss(style);
+    const logicalStyle = cssPhysicalToLogical(style);
     const expected = JSON.parse(el.textContent.trim());
     const [misKey, misValue] = Object.entries(expected).find(([k, v]) => logicalStyle[k] !== v) || [];
     if (misKey) {
       console.log(`❌ERROR ${el.id}: ${misKey} (expected: ${misValue}, got: ${logicalStyle[misKey]})`);
       debugger;
-      physicalToLogicalCss(style);
+      cssPhysicalToLogical(style);
     } else
       console.log(`✅OK ${el.id}`);
   }
