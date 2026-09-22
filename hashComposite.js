@@ -110,13 +110,13 @@ class WeakHashMap {
 const HASHCACHE = new WeakHashMap();
 const DIRTY = Symbol("dirty");
 
-export function composite(obj) {
+export function Composite(obj) {
   const res = compositeImpl(obj, new WeakSet());
   return res === DIRTY ? obj : res;
 }
 
 function compositeImpl(obj, seen) {
-  if (composite.is(obj)) return obj;
+  if (Composite.is(obj)) return obj;
   if (Object.isFrozen(obj)) return DIRTY;
 
   const proto = Object.getPrototypeOf(obj);
@@ -154,12 +154,13 @@ function compositeImpl(obj, seen) {
   return dirty ? DIRTY : HASHCACHE.add(hash, Object.freeze(obj));
 }
 
-composite.is = function is(v) {
+Composite.is = function is(v) {
   return v == null || typeof v === 'string' ||
     typeof v === 'number' || typeof v === 'boolean' ||
     typeof v === 'bigint' || HASHCACHE.getHash(v) !== undefined;
 }
 
+/* Lens API paused while the composite/hash behavior is being settled.
 composite.lenseSet = function lenseSet() {
 };
 
@@ -194,6 +195,8 @@ const value = arguments.at(-1);
     throw new TypeError("composite.lensePush: Expected an array at path " + arguments.slice(1, arguments.length - 1).join(".") + ", but got " + typeof ar);
   ar.push(value);
 }
+
+*/
 
 //const newState = composite.lensePush(state, "bob", "alice", "and a one");
 //const newState = composite.lenseSet(state, "bob", "alice", -3, "and a one");
