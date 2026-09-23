@@ -1,20 +1,19 @@
 const f64 = new Float64Array(1);
 const u32 = new Uint32Array(f64.buffer);
 const HASHTAGS = {
-  string: 1,
+  object: 0,
+  array: 1,
   number: 2,
   bigint: 3,
   true: 4,
   false: 5,
-  object: 6,
+  string: 6,
   null: 7,
   undefined: 8,
-  array: 9,
   objectLiteral: 10,
   property: 11,
   function: 12,
 };
-
 function hashString(hash, str) {
   for (let i = 0; i < str.length; i++)
     hash = Math.imul(hash ^ str.charCodeAt(i), 0x01000193);
@@ -117,7 +116,6 @@ export function Composite(obj) {
 
 function compositeImpl(obj, seen) {
   if (Composite.is(obj)) return obj;
-  if (Object.isFrozen(obj)) return DIRTY;
 
   const proto = Object.getPrototypeOf(obj);
   const isArray = proto === Array.prototype;
@@ -126,11 +124,10 @@ function compositeImpl(obj, seen) {
   if (seen.has(obj)) return DIRTY;
   seen.add(obj);
 
-  let hash = isArray ?
-    Math.imul(Math.imul(0x811c9dc5 ^ HASHTAGS.array, 0x01000193) ^ obj.length, 0x01000193) :
-    Math.imul(0x811c9dc5 ^ HASHTAGS.objectLiteral, 0x01000193);
+  let hash = Math.imul(0x811c9dc5 ^ isArray, 0x01000193); //isArray is 1 for array, 0 for object
   let dirty = false;
   const keys = Object.keys(obj);
+  let target;
   for (let i = 0; i < keys.length; i++) {
     const k = keys[i];
     const o = obj[k];
@@ -139,19 +136,20 @@ function compositeImpl(obj, seen) {
       dirty = true;
       continue;
     }
-    obj[k] = v;
-    if (dirty)
-      continue;
-    hash = Math.imul(hash ^ HASHTAGS.property, 0x01000193);
-    hash = hashString(hash, k);
-    const t = typeof v;
-    hash = (v && t === 'object') ?
-      Math.imul(hash ^ HASHCACHE.getHash(v), 0x01000193) :
-      hashPrimitive(hash, v);
+    if (!dirty) {
+      hash = Math.imul(hash ^ HASHTAGS.property, 0x01000193);
+      hash = hashString(hash, k);
+      const t = typeof v;
+      hash = (v && t === 'object') ?
+        Math.imul(hash ^ HASHCACHE.getHash(v), 0x01000193) :
+        hashPrimitive(hash, v);
+    }
+    target ??= Object.assign(Object.create(proto), obj);
+    target[k] = v;
   }
 
   seen.delete(obj);
-  return dirty ? DIRTY : HASHCACHE.add(hash, Object.freeze(obj));
+  return dirty ? DIRTY : HASHCACHE.add(hash, Object.freeze(target ?? obj));
 }
 
 Composite.is = function is(v) {

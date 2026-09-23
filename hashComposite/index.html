@@ -1,0 +1,149 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>hashComposite</title>
+<h1>hashComposite</h1>
+<script type="module">
+  import { Composite } from "../hashComposite.js";
+
+  let failed = [];
+  let passed = 0;
+
+  function check(description, ok) {
+    if (!ok) {
+      failed.push(description);
+      console.error("FAIL —", description);
+    } else {
+      passed++;
+      console.log("PASS —", description);
+    }
+  }
+
+  console.group("Primitives pass through and Composite.is(primitive) is true");
+  for (const value of [null, undefined, true, false, "Alice", 42, 1.5, 42n])
+    check(`${String(value)} (${typeof value}) passes through`, Composite(value) === value && Composite.is(value));
+  console.groupEnd();
+
+
+  console.group("Basic objects");
+  const a = { name: "Alice" }, b = { name: "Alice" };
+  const A = Composite(a), B = Composite(b), A2 = Composite({ name: "Bob" });
+  check("Before conversion: a !== b", a !== b);
+  check("After conversion: A === B", A === B);
+  check("Different contents give a different object", A !== A2);
+  check("Composite.is(A) is true", Composite.is(A));
+  check("Converting it again returns it immediately", Composite(A) === A);
+  console.groupEnd();
+
+  console.group("Basic arrays");
+  const arrA = [1, 2, 3], arrB = [1, 2, 3], arrC = [3, 2, 1];
+  const ArrA = Composite(arrA), ArrB = Composite(arrB), ArrC = Composite(arrC);
+  check("Before conversion: arrA !== arrB", arrA !== arrB);
+  check("After conversion: ArrA === ArrB", ArrA === ArrB);
+  check("Different order gives a different array", ArrA !== ArrC);
+  check("Composite.is(ArrA) is true", Composite.is(ArrA));
+  check("Converting it again returns it immediately", Composite(ArrA) === ArrA);
+  console.groupEnd();
+
+  console.group("Basic children");
+  const treeA = Composite({ id: 1, user: { name: "Alice" }, tags: ["js", "web"], extra: { a: 1, b: 2 } });
+  const treeB = Composite({ id: 2, user: { name: "Alice" }, tags: ["web", "js"], extra: { b: 2, a: 1 } });
+  check("Different IDs keep the parents separate", treeA !== treeB);
+  check("The user objects are shared", treeA.user === treeB.user);
+  check("The arrays are shared", treeA.tags === treeB.tags);
+  check("Array order matters", treeA.tags !== Composite(["web", "js"]));
+  check("Property order matters", treeA.extra !== treeB.extra);
+  check("An identical whole tree reuses the root", treeA === Composite({ id: 1, user: { name: "Alice" }, tags: ["js", "web"], extra: { a: 1, b: 2 } }));
+  console.groupEnd();
+
+  console.group("Conversion freezes objects");
+  const warm = { user: { name: "Bob" } };
+  warm.user.name = "Changed";
+  const cold = Composite(warm);
+  try {
+    cold.user.name = "Changed again";
+  } catch (error) {
+    check("Writing to the frozen child throws TypeError", error instanceof TypeError);
+  }
+  check("The frozen child is unchanged", cold.user.name === "Changed");
+  console.groupEnd();
+
+  console.group("Frozen objects, that can be ");
+  const shared = Composite({ name: "Carol" });
+  const freezeInput = { user: { name: "Carol" } };
+  const originalChild = freezeInput.user;
+  const freezeResult = Composite(freezeInput);
+  check("The input now points to the shared child", freezeInput.user === shared);
+  check("The original child was replaced", freezeInput.user !== originalChild);
+  check("The input root is frozen", Object.isFrozen(freezeInput));
+  check("The returned child is frozen", Object.isFrozen(freezeResult.user));
+  let mutationRejected = false;
+  try {
+    freezeResult.user.name = "Changed";
+  } catch (error) {
+    mutationRejected = error instanceof TypeError;
+  }
+  check("Writing to the frozen child throws TypeError", mutationRejected);
+  check("Its value stays unchanged", freezeResult.user.name === "Carol");
+  console.groupEnd();
+
+  console.group("5. Updating without a lens");
+  const before = Composite({ user: { name: "Alice" }, tags: ["js"] });
+  const after = Composite({ ...before, user: { ...before.user, name: "Bob" } });
+  check("The root changes", after !== before);
+  check("The edited branch changes", after.user !== before.user);
+  check("The untouched array stays shared", after.tags === before.tags);
+  check("The old name is preserved", before.user.name === "Alice");
+  check("The new name is Bob", after.user.name === "Bob");
+  const noChange = Composite({ ...after, user: { ...after.user, name: "Bob" } });
+  check("An update with equal contents returns the same root", noChange === after);
+  console.groupEnd();
+
+  console.group("6. Unsupported contents allow partial conversion");
+  const partialInput = { user: { name: "Dana" }, created: new Date(0) };
+  const partialResult = Composite(partialInput);
+  check("The original root is returned", partialResult === partialInput);
+  check("The root is not a composite", !Composite.is(partialResult));
+  check("The root stays mutable", !Object.isFrozen(partialResult));
+  check("The supported child is a composite", Composite.is(partialResult.user));
+  check("The supported child is frozen", Object.isFrozen(partialResult.user));
+  check("The Date is not a composite", !Composite.is(partialResult.created));
+  console.groupEnd();
+
+  console.group("Extra: key order and frozen inputs");
+  check("Reordered object keys stay separate", Composite({ a: 1, b: 2 }) !== Composite({ b: 2, a: 1 }));
+  const frozen = Object.freeze({ alreadyFrozen: true });
+  check("A pre-frozen object passes through", Composite(frozen) === frozen);
+  check("It remains unregistered", !Composite.is(frozen));
+  console.groupEnd();
+
+  console.group("Extra: cycles and symbol keys");
+  const cycle = {};
+  cycle.self = cycle;
+  check("A cycle returns without infinite recursion", Composite(cycle) === cycle);
+  check("The cyclic root is unregistered", !Composite.is(cycle));
+  const symbolic = { [Symbol("label")]: "value" };
+  check("An object with a symbol key passes through", Composite(symbolic) === symbolic);
+  check("The symbol-keyed object is unregistered", !Composite.is(symbolic));
+  console.groupEnd();
+
+  console.group("Extra: equality details");
+  check("Positive and negative zero stay distinct inside objects", Composite({ zero: 0 }) !== Composite({ zero: -0 }));
+  check("NaN contents can be shared", Composite({ number: NaN }) === Composite({ number: NaN }));
+  check("A hole differs from an explicit undefined", Composite(new Array(1)) !== Composite([undefined]));
+  const plain = Composite({ prototypeExample: 1 });
+  const bare = Object.assign(Object.create(null), { prototypeExample: 1 });
+  check("A null-prototype input can reuse a plain object", Composite(bare) === plain);
+  console.groupEnd();
+
+  console.group("Extra: hidden properties are ignored (limitation)");
+  const hiddenChild = { mutable: true };
+  const hiddenInput = Object.defineProperty({ hiddenExample: 1 }, "hidden", { value: hiddenChild });
+  const hiddenResult = Composite(hiddenInput);
+  check("The root is registered", Composite.is(hiddenResult));
+  check("The hidden child is not frozen", !Object.isFrozen(hiddenChild));
+  check("An input without that hidden property reuses this root", Composite({ hiddenExample: 1 }) === hiddenResult);
+  console.groupEnd();
+
+  console.log(`hashComposite tutorial finished: ${failed.length} failed.`);
+  console.log("Garbage-collection timing and weak-cache cleanup are not exercised by this tutorial.");
+</script>
