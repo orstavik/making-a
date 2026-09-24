@@ -138,39 +138,6 @@
       },
     },
 
-    "Consume": {
-      "Fresh inputs and children are reused and frozen": () => {
-        const child = { consumeExample: Symbol("unique") };
-        const input = { child };
-        const result = Composite.consume(input);
-        return result === input && result.child === child &&
-          Object.isFrozen(input) && Object.isFrozen(child);
-      },
-      "Cached children replace equal input children": () => {
-        const shared = Composite({ consumeShared: "Carol" });
-        const original = { consumeShared: "Carol" };
-        const input = { child: original };
-        const result = Composite.consume(input);
-        return input.child === shared && result.child === shared && Object.isFrozen(original);
-      },
-      "A cached root may replace the input": () => {
-        const shared = Composite({ consumeRoot: 1 });
-        const input = { consumeRoot: 1 };
-        return Composite.consume(input) === shared && Object.isFrozen(input);
-      },
-      "Unregistered frozen inputs are rejected": () =>
-        throws(() => Composite.consume(Object.freeze({}))),
-      "Existing composites are accepted": () => {
-        const input = Composite({ existingConsume: 1 });
-        return Composite.consume(input) === input;
-      },
-      "Errors may leave earlier children frozen": () => {
-        const input = { child: { partialConsume: 1 }, invalid: new Date(0) };
-        return throws(() => Composite.consume(input)) &&
-          Object.isFrozen(input.child) && !Object.isFrozen(input);
-      },
-    },
-
     "Updates": {
       "Changed branches are replaced and untouched branches shared": () => {
         const before = Composite({ user: { name: "Alice" }, tags: ["js"] });
@@ -245,6 +212,78 @@
       "Signed zeros under symbol keys remain distinct": () => {
         const key = Symbol("zero");
         return Composite({ [key]: 0 }) !== Composite({ [key]: -0 });
+      },
+    },
+
+    "Consume": {
+      "Fresh inputs and children are reused and frozen": () => {
+        const child = { consumeExample: Symbol("unique") };
+        const input = { child };
+        const result = Composite.consume(input);
+        return result === input && result.child === child &&
+          Object.isFrozen(input) && Object.isFrozen(child);
+      },
+      "Cached children replace equal input children": () => {
+        const shared = Composite({ consumeShared: "Carol" });
+        const original = { consumeShared: "Carol" };
+        const input = { child: original };
+        const result = Composite.consume(input);
+        return input.child === shared && result.child === shared && !Object.isFrozen(original) && Object.isFrozen(shared);
+      },
+      "Shared children work with and without a cached equivalent": () =>
+        [false, true].every(precache => {
+          const marker = Symbol("consume alias");
+          const cached = precache ? Composite({ marker }) : undefined;
+          const child = { marker };
+          const input = { a: child, b: { child } };
+          const result = Composite.consume(input);
+          return result === input && result.a === result.b.child &&
+            result.a === (cached ?? child) && Object.isFrozen(child) === !precache &&
+            Object.isFrozen(result.a) &&
+            Object.isFrozen(result.b) && Object.isFrozen(result);
+        }),
+      "Sparse arrays and symbol-keyed children are reused and frozen": () => {
+        const key = Symbol("array child");
+        const child = { marker: Symbol("consume array") };
+        const input = [child];
+        input.length = 4;
+        input[key] = child;
+        const result = Composite.consume(input);
+        return result === input && Array.isArray(result) && result.length === 4 &&
+          !(1 in result) && !(3 in result) && result[0] === child &&
+          result[key] === child && Object.isFrozen(child) && Object.isFrozen(result);
+      },
+      "Nested unregistered frozen objects are rejected": () => {
+        const child = Object.freeze({ marker: Symbol("frozen child") });
+        const input = { child };
+        return throws(() => Composite.consume(input)) &&
+          input.child === child && !Object.isFrozen(input) && !Composite.is(child);
+      },
+      "Read-only properties reject child replacement": () => {
+        const marker = Symbol("read-only child");
+        Composite({ marker });
+        const child = { marker };
+        const input = Object.defineProperty({}, "child", {
+          value: child, enumerable: true, configurable: true, writable: false,
+        });
+        return throws(() => Composite.consume(input)) &&
+          input.child === child && !Object.isFrozen(input) && !Object.isFrozen(child);
+      },
+      "A cached root may replace the input": () => {
+        const shared = Composite({ consumeRoot: 1 });
+        const input = { consumeRoot: 1 };
+        return Composite.consume(input) === shared && !Object.isFrozen(input) && Object.isFrozen(shared);
+      },
+      "Unregistered frozen inputs are rejected": () =>
+        throws(() => Composite.consume(Object.freeze({}))),
+      "Existing composites are accepted": () => {
+        const input = Composite({ existingConsume: 1 });
+        return Composite.consume(input) === input;
+      },
+      "Errors may leave earlier children frozen": () => {
+        const input = { child: { partialConsume: 1 }, invalid: new Date(0) };
+        return throws(() => Composite.consume(input)) &&
+          Object.isFrozen(input.child) && !Object.isFrozen(input);
       },
     },
   };

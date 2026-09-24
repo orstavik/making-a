@@ -170,7 +170,9 @@ function CompositeImpl(obj, reuse = false, seen = new Set()) {
     target[k] = v;
   }
   seen.delete(obj);
-  return HASHCACHE.add(hash, Object.freeze(target));
+  const result = HASHCACHE.add(hash, target);
+  if (result === target) Object.freeze(target);
+  return result;
 }
 
 Composite.is = function is(v) {
