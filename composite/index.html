@@ -340,101 +340,99 @@
     },
 
     "Numeric equality": {
-      "Uint32 boundaries preserve values and reuse equal objects (clone)": () => {
-        const negative = Composite({ value: -1 });
-        if (!Object.is(negative.value, -1)) return false;
-        if (Composite({ value: -1 }) !== negative) return false;
-        const zero = Composite({ value: 0 });
-        if (!Object.is(zero.value, 0)) return false;
-        if (Composite({ value: 0 }) !== zero) return false;
-        const one = Composite({ value: 1 });
-        if (!Object.is(one.value, 1)) return false;
-        if (Composite({ value: 1 }) !== one) return false;
-        const belowMax = Composite({ value: 0xFFFFFFFE });
-        if (!Object.is(belowMax.value, 0xFFFFFFFE)) return false;
-        if (Composite({ value: 0xFFFFFFFE }) !== belowMax) return false;
-        const max = Composite({ value: 0xFFFFFFFF });
-        if (!Object.is(max.value, 0xFFFFFFFF)) return false;
-        if (Composite({ value: 0xFFFFFFFF }) !== max) return false;
-        const aboveMax = Composite({ value: 0x100000000 });
-        if (!Object.is(aboveMax.value, 0x100000000)) return false;
-        if (Composite({ value: 0x100000000 }) !== aboveMax) return false;
-        const next = Composite({ value: 0x100000001 });
-        if (!Object.is(next.value, 0x100000001)) return false;
-        if (Composite({ value: 0x100000001 }) !== next) return false;
-        return new Set([negative, zero, one, belowMax, max, aboveMax, next]).size === 7;
+      "-1: value is preserved and equal objects share": () => {
+        const result = Composite({ value: -1 });
+        return Object.is(result.value, -1) &&
+          Composite({ value: -1 }) === result;
       },
-      "Uint32 boundaries preserve values and reuse equal objects (consume)": () => {
-        const negative = Composite.consume({ value: -1 });
-        if (!Object.is(negative.value, -1)) return false;
-        if (Composite.consume({ value: -1 }) !== negative) return false;
-        const zero = Composite.consume({ value: 0 });
-        if (!Object.is(zero.value, 0)) return false;
-        if (Composite.consume({ value: 0 }) !== zero) return false;
-        const one = Composite.consume({ value: 1 });
-        if (!Object.is(one.value, 1)) return false;
-        if (Composite.consume({ value: 1 }) !== one) return false;
-        const belowMax = Composite.consume({ value: 0xFFFFFFFE });
-        if (!Object.is(belowMax.value, 0xFFFFFFFE)) return false;
-        if (Composite.consume({ value: 0xFFFFFFFE }) !== belowMax) return false;
-        const max = Composite.consume({ value: 0xFFFFFFFF });
-        if (!Object.is(max.value, 0xFFFFFFFF)) return false;
-        if (Composite.consume({ value: 0xFFFFFFFF }) !== max) return false;
-        const aboveMax = Composite.consume({ value: 0x100000000 });
-        if (!Object.is(aboveMax.value, 0x100000000)) return false;
-        if (Composite.consume({ value: 0x100000000 }) !== aboveMax) return false;
-        const next = Composite.consume({ value: 0x100000001 });
-        if (!Object.is(next.value, 0x100000001)) return false;
-        if (Composite.consume({ value: 0x100000001 }) !== next) return false;
-        return new Set([negative, zero, one, belowMax, max, aboveMax, next]).size === 7;
+      "0: value is preserved and equal objects share": () => {
+        const result = Composite({ value: 0 });
+        return Object.is(result.value, 0) &&
+          Composite({ value: 0 }) === result;
       },
-      "Fractions and extreme finite numbers preserve values and reuse (clone)": () => {
-        const negativeFraction = Composite({ value: -1.5 });
-        if (!Object.is(negativeFraction.value, -1.5)) return false;
-        if (Composite({ value: -1.5 }) !== negativeFraction) return false;
-        const fraction = Composite({ value: 1.5 });
-        if (!Object.is(fraction.value, 1.5)) return false;
-        if (Composite({ value: 1.5 }) !== fraction) return false;
-        const smallest = Composite({ value: Number.MIN_VALUE });
-        if (!Object.is(smallest.value, Number.MIN_VALUE)) return false;
-        if (Composite({ value: Number.MIN_VALUE }) !== smallest) return false;
-        const negativeSmallest = Composite({ value: -Number.MIN_VALUE });
-        if (!Object.is(negativeSmallest.value, -Number.MIN_VALUE)) return false;
-        if (Composite({ value: -Number.MIN_VALUE }) !== negativeSmallest) return false;
-        const largest = Composite({ value: Number.MAX_VALUE });
-        if (!Object.is(largest.value, Number.MAX_VALUE)) return false;
-        if (Composite({ value: Number.MAX_VALUE }) !== largest) return false;
-        const negativeLargest = Composite({ value: -Number.MAX_VALUE });
-        if (!Object.is(negativeLargest.value, -Number.MAX_VALUE)) return false;
-        if (Composite({ value: -Number.MAX_VALUE }) !== negativeLargest) return false;
-        const safeInteger = Composite({ value: Number.MAX_SAFE_INTEGER });
-        if (!Object.is(safeInteger.value, Number.MAX_SAFE_INTEGER)) return false;
-        if (Composite({ value: Number.MAX_SAFE_INTEGER }) !== safeInteger) return false;
-        return new Set([negativeFraction, fraction, smallest, negativeSmallest, largest, negativeLargest, safeInteger]).size === 7;
+      "1: value is preserved and equal objects share": () => {
+        const result = Composite({ value: 1 });
+        return Object.is(result.value, 1) &&
+          Composite({ value: 1 }) === result;
       },
-      "Fractions and extreme finite numbers preserve values and reuse (consume)": () => {
-        const negativeFraction = Composite.consume({ value: -1.5 });
-        if (!Object.is(negativeFraction.value, -1.5)) return false;
-        if (Composite.consume({ value: -1.5 }) !== negativeFraction) return false;
-        const fraction = Composite.consume({ value: 1.5 });
-        if (!Object.is(fraction.value, 1.5)) return false;
-        if (Composite.consume({ value: 1.5 }) !== fraction) return false;
-        const smallest = Composite.consume({ value: Number.MIN_VALUE });
-        if (!Object.is(smallest.value, Number.MIN_VALUE)) return false;
-        if (Composite.consume({ value: Number.MIN_VALUE }) !== smallest) return false;
-        const negativeSmallest = Composite.consume({ value: -Number.MIN_VALUE });
-        if (!Object.is(negativeSmallest.value, -Number.MIN_VALUE)) return false;
-        if (Composite.consume({ value: -Number.MIN_VALUE }) !== negativeSmallest) return false;
-        const largest = Composite.consume({ value: Number.MAX_VALUE });
-        if (!Object.is(largest.value, Number.MAX_VALUE)) return false;
-        if (Composite.consume({ value: Number.MAX_VALUE }) !== largest) return false;
-        const negativeLargest = Composite.consume({ value: -Number.MAX_VALUE });
-        if (!Object.is(negativeLargest.value, -Number.MAX_VALUE)) return false;
-        if (Composite.consume({ value: -Number.MAX_VALUE }) !== negativeLargest) return false;
-        const safeInteger = Composite.consume({ value: Number.MAX_SAFE_INTEGER });
-        if (!Object.is(safeInteger.value, Number.MAX_SAFE_INTEGER)) return false;
-        if (Composite.consume({ value: Number.MAX_SAFE_INTEGER }) !== safeInteger) return false;
-        return new Set([negativeFraction, fraction, smallest, negativeSmallest, largest, negativeLargest, safeInteger]).size === 7;
+      "Uint32 maximum minus one: value is preserved and equal objects share": () => {
+        const result = Composite({ value: 0xFFFFFFFE });
+        return Object.is(result.value, 0xFFFFFFFE) &&
+          Composite({ value: 0xFFFFFFFE }) === result;
+      },
+      "Uint32 maximum: value is preserved and equal objects share": () => {
+        const result = Composite({ value: 0xFFFFFFFF });
+        return Object.is(result.value, 0xFFFFFFFF) &&
+          Composite({ value: 0xFFFFFFFF }) === result;
+      },
+      "Uint32 maximum plus one: value is preserved and equal objects share": () => {
+        const result = Composite({ value: 0x100000000 });
+        return Object.is(result.value, 0x100000000) &&
+          Composite({ value: 0x100000000 }) === result;
+      },
+      "Uint32 maximum plus two: value is preserved and equal objects share": () => {
+        const result = Composite({ value: 0x100000001 });
+        return Object.is(result.value, 0x100000001) &&
+          Composite({ value: 0x100000001 }) === result;
+      },
+      "Uint32 boundary values remain distinct": () => {
+        const results = new Set([
+          Composite({ value: -1 }),
+          Composite({ value: 0 }),
+          Composite({ value: 1 }),
+          Composite({ value: 0xFFFFFFFE }),
+          Composite({ value: 0xFFFFFFFF }),
+          Composite({ value: 0x100000000 }),
+          Composite({ value: 0x100000001 }),
+        ]);
+        return results.size === 7;
+      },
+      "Negative fractions: value is preserved and equal objects share": () => {
+        const result = Composite({ value: -1.5 });
+        return Object.is(result.value, -1.5) &&
+          Composite({ value: -1.5 }) === result;
+      },
+      "Positive fractions: value is preserved and equal objects share": () => {
+        const result = Composite({ value: 1.5 });
+        return Object.is(result.value, 1.5) &&
+          Composite({ value: 1.5 }) === result;
+      },
+      "Smallest positive number: value is preserved and equal objects share": () => {
+        const result = Composite({ value: Number.MIN_VALUE });
+        return Object.is(result.value, Number.MIN_VALUE) &&
+          Composite({ value: Number.MIN_VALUE }) === result;
+      },
+      "Smallest negative magnitude: value is preserved and equal objects share": () => {
+        const result = Composite({ value: -Number.MIN_VALUE });
+        return Object.is(result.value, -Number.MIN_VALUE) &&
+          Composite({ value: -Number.MIN_VALUE }) === result;
+      },
+      "Largest positive finite number: value is preserved and equal objects share": () => {
+        const result = Composite({ value: Number.MAX_VALUE });
+        return Object.is(result.value, Number.MAX_VALUE) &&
+          Composite({ value: Number.MAX_VALUE }) === result;
+      },
+      "Largest negative finite magnitude: value is preserved and equal objects share": () => {
+        const result = Composite({ value: -Number.MAX_VALUE });
+        return Object.is(result.value, -Number.MAX_VALUE) &&
+          Composite({ value: -Number.MAX_VALUE }) === result;
+      },
+      "Maximum safe integer: value is preserved and equal objects share": () => {
+        const result = Composite({ value: Number.MAX_SAFE_INTEGER });
+        return Object.is(result.value, Number.MAX_SAFE_INTEGER) &&
+          Composite({ value: Number.MAX_SAFE_INTEGER }) === result;
+      },
+      "Fractions and extreme finite values remain distinct": () => {
+        const results = new Set([
+          Composite({ value: -1.5 }),
+          Composite({ value: 1.5 }),
+          Composite({ value: Number.MIN_VALUE }),
+          Composite({ value: -Number.MIN_VALUE }),
+          Composite({ value: Number.MAX_VALUE }),
+          Composite({ value: -Number.MAX_VALUE }),
+          Composite({ value: Number.MAX_SAFE_INTEGER }),
+        ]);
+        return results.size === 7;
       },
       "Signed zeros stay distinct": () =>
         Composite({ zero: 0 }) !== Composite({ zero: -0 }),
@@ -564,19 +562,25 @@
     },
 
     "Symbols": {
-      "Local, registered, empty-name and well-known symbols work as keys and values": () => {
+      "Local symbols work as keys and values": () => {
         const local = Symbol("local");
-        if (Composite({ value: local }) !== Composite({ value: local })) return false;
-        if (Composite({ [local]: 1 }) !== Composite({ [local]: 1 })) return false;
+        return Composite({ value: local }) === Composite({ value: local }) &&
+          Composite({ [local]: 1 }) === Composite({ [local]: 1 });
+      },
+      "Registered symbols work as keys and values": () => {
         const registered = Symbol.for("registered");
-        if (Composite({ value: registered }) !== Composite({ value: registered })) return false;
-        if (Composite({ [registered]: 1 }) !== Composite({ [registered]: 1 })) return false;
+        return Composite({ value: registered }) === Composite({ value: registered }) &&
+          Composite({ [registered]: 1 }) === Composite({ [registered]: 1 });
+      },
+      "Empty-name registered symbols work as keys and values": () => {
         const empty = Symbol.for("");
-        if (Composite({ value: empty }) !== Composite({ value: empty })) return false;
-        if (Composite({ [empty]: 1 }) !== Composite({ [empty]: 1 })) return false;
+        return Composite({ value: empty }) === Composite({ value: empty }) &&
+          Composite({ [empty]: 1 }) === Composite({ [empty]: 1 });
+      },
+      "Well-known symbols work as keys and values": () => {
         const wellKnown = Symbol.iterator;
-        if (Composite({ value: wellKnown }) !== Composite({ value: wellKnown })) return false;
-        return Composite({ [wellKnown]: 1 }) === Composite({ [wellKnown]: 1 });
+        return Composite({ value: wellKnown }) === Composite({ value: wellKnown }) &&
+          Composite({ [wellKnown]: 1 }) === Composite({ [wellKnown]: 1 });
       },
       "Different symbols with the same description remain distinct": () => {
         const a = Symbol("same"), b = Symbol("same");
@@ -604,35 +608,32 @@
         const result = Composite.consume(input);
         return input.child === shared && result.child === shared && !Object.isFrozen(original) && Object.isFrozen(shared);
       },
-      "Shared children work with and without a cached equivalent": () => {
-        {
-          const marker = Symbol("consume alias");
-          const child = { marker };
-          const input = { a: child, b: { child } };
-          const result = Composite.consume(input);
-          if (result !== input) return false;
-          if (result.a !== result.b.child) return false;
-          if (result.a !== child) return false;
-          if (!Object.isFrozen(child)) return false;
-          if (!Object.isFrozen(result.a)) return false;
-          if (!Object.isFrozen(result.b)) return false;
-          if (!Object.isFrozen(result)) return false;
-        }
-        {
-          const marker = Symbol("consume alias");
-          const cached = Composite({ marker });
-          const child = { marker };
-          const input = { a: child, b: { child } };
-          const result = Composite.consume(input);
-          if (result !== input) return false;
-          if (result.a !== result.b.child) return false;
-          if (result.a !== cached) return false;
-          if (Object.isFrozen(child)) return false;
-          if (!Object.isFrozen(result.a)) return false;
-          if (!Object.isFrozen(result.b)) return false;
-          if (!Object.isFrozen(result)) return false;
-        }
-        return true;
+      "Shared children are reused without a cached equivalent": () => {
+        const marker = Symbol("consume alias");
+        const child = { marker };
+        const input = { a: child, b: { child } };
+        const result = Composite.consume(input);
+        if (result !== input) return false;
+        if (result.a !== result.b.child) return false;
+        if (result.a !== child) return false;
+        if (!Object.isFrozen(child)) return false;
+        if (!Object.isFrozen(result.a)) return false;
+        if (!Object.isFrozen(result.b)) return false;
+        return Object.isFrozen(result);
+      },
+      "Shared children reuse an existing cached equivalent": () => {
+        const marker = Symbol("consume alias");
+        const cached = Composite({ marker });
+        const child = { marker };
+        const input = { a: child, b: { child } };
+        const result = Composite.consume(input);
+        if (result !== input) return false;
+        if (result.a !== result.b.child) return false;
+        if (result.a !== cached) return false;
+        if (Object.isFrozen(child)) return false;
+        if (!Object.isFrozen(result.a)) return false;
+        if (!Object.isFrozen(result.b)) return false;
+        return Object.isFrozen(result);
       },
       "Sparse arrays and symbol-keyed children are reused and frozen": () => {
         const key = Symbol("array child");
