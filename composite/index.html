@@ -54,6 +54,25 @@
           .every(value => Object.is(Composite(value), value) && Composite.is(value)),
     },
 
+    "Type and property distinctions": {
+      "Empty objects and arrays remain distinct in both modes": () =>
+        [Composite, Composite.consume].every(convert => convert({}) !== convert([])),
+      "Missing properties differ from explicit undefined in both modes": () =>
+        [Composite, Composite.consume].every(convert => {
+          const missing = convert({});
+          const present = convert({ x: undefined });
+          return missing !== present && !Object.hasOwn(missing, "x") &&
+            Object.hasOwn(present, "x") && present.x === undefined;
+        }),
+      "Primitive types remain distinct inside objects in both modes": () =>
+        [Composite, Composite.consume].every(convert => {
+          const values = [1, "1", 1n, null, undefined, false, true, 0, ""];
+          const results = values.map(value => convert({ value }));
+          return new Set(results).size === values.length && results.every((result, index) =>
+            Object.is(result.value, values[index]) && result === convert({ value: values[index] }));
+        }),
+    },
+
     "Objects and children": {
       "Equal objects share a reference": () =>
         Composite({ name: "Alice" }) === Composite({ name: "Alice" }),
@@ -152,8 +171,15 @@
     },
 
     "Unsupported inputs and cycles": {
-      "Unsupported prototypes throw in both modes": () =>
-        [Composite, Composite.consume].every(convert => throws(() => convert(new Date(0)))),
+      "Unsupported types throw at the root and nested in both modes": () => {
+        class Example {}
+        const factories = [
+          () => new Date(0), () => function example() {}, () => new Map(),
+          () => new Set(), () => new Uint8Array([1]), () => new Example(),
+        ];
+        return [Composite, Composite.consume].every(convert => factories.every(make =>
+          throws(() => convert(make())) && throws(() => convert({ value: make() }))));
+      },
       "A failed clone leaves earlier input children mutable": () => {
         const child = { failedClone: 1 };
         const input = { child, invalid: new Date(0) };
@@ -183,6 +209,21 @@
     },
 
     "Numeric equality": {
+      "Uint32 boundaries preserve values and reuse equal objects in both modes": () =>
+        [Composite, Composite.consume].every(convert => {
+          const values = [-1, 0, 1, 0xFFFFFFFE, 0xFFFFFFFF, 0x100000000, 0x100000001];
+          const results = values.map(value => convert({ value }));
+          return new Set(results).size === values.length && results.every((result, index) =>
+            Object.is(result.value, values[index]) && result === convert({ value: values[index] }));
+        }),
+      "Fractions and extreme finite numbers preserve values and reuse in both modes": () =>
+        [Composite, Composite.consume].every(convert => {
+          const values = [-1.5, 1.5, Number.MIN_VALUE, -Number.MIN_VALUE,
+            Number.MAX_VALUE, -Number.MAX_VALUE, Number.MAX_SAFE_INTEGER];
+          const results = values.map(value => convert({ value }));
+          return new Set(results).size === values.length && results.every((result, index) =>
+            Object.is(result.value, values[index]) && result === convert({ value: values[index] }));
+        }),
       "Signed zeros stay distinct": () =>
         Composite({ zero: 0 }) !== Composite({ zero: -0 }),
       "Infinity signs stay distinct": () =>
@@ -197,6 +238,24 @@
         const b = view.getFloat64(0);
         return Composite({ number: a }) === Composite({ number: b });
       },
+    },
+
+    "Strings": {
+      "Empty, Unicode and embedded-null values preserve contents and reuse in both modes": () =>
+        [Composite, Composite.consume].every(convert => {
+          const values = ["", "a", "😀", "😁", "\uD83D", "\0", "a\0b", "ab"];
+          const results = values.map(value => convert({ value }));
+          return new Set(results).size === values.length && results.every((result, index) =>
+            result.value === values[index] && result === convert({ value: values[index] }));
+        }),
+      "Empty, Unicode and embedded-null property keys remain distinct in both modes": () =>
+        [Composite, Composite.consume].every(convert => {
+          const keys = ["", "😀", "😁", "\0", "a\0b", "ab"];
+          const results = keys.map(key => convert({ [key]: 1 }));
+          return new Set(results).size === keys.length && results.every((result, index) =>
+            Object.hasOwn(result, keys[index]) && result[keys[index]] === 1 &&
+            result === convert({ [keys[index]]: 1 }));
+        }),
     },
 
     "Symbols": {
