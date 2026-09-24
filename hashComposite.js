@@ -125,44 +125,52 @@ class WeakHashMap {
 }
 
 const HASHCACHE = new WeakHashMap();
-const DIRTY = Symbol("dirty");
-
+/**
+ * @param {*} obj plain data objects, arrays, primitives or symbols; accessors and proxies are unsupported. 
+ * @returns a deeply immutable version of the input object with a consistent hash.
+ */
 export function Composite(obj) {
-  const res = compositeImpl(obj, new WeakSet());
-  return res === DIRTY ? obj : res;
+  return CompositeImpl(obj);
 }
 
-function compositeImpl(obj, seen) {
-  if (Composite.is(obj)) return obj;
+/**
+ * Typically used as a wrapper around JSON object: Composite.consume(JSON.parse(...)).
+ * Runs in overwrite/mutate mode. Reuse, mutates and freezes all objects to avoid creating new objects.
+ * Fails with already frozen, but not composite objects.
+ * If the function errors half way through, the input object may be partially mutated and frozen. 
+ * Use with caution.
+ * @param {*} obj plain data objects, arrays, primitives or symbols; accessors and proxies are unsupported. 
+ * @returns a deeply immutable version of the input object with a consistent hash.
+ */
+Composite.consume = function consume(obj) {
+  return CompositeImpl(obj, true);
+}
 
+function CompositeImpl(obj, reuse = false, seen = new Set()) {
+  if (Composite.is(obj)) return obj;
+  if (reuse && Object.isFrozen(obj))
+    throw new TypeError("Composite.consume: Input is already frozen.");
   const proto = Object.getPrototypeOf(obj);
   const isArray = proto === Array.prototype;
-  if (!isArray && proto !== Object.prototype && proto !== null) return DIRTY;
-  if (seen.has(obj)) return DIRTY;
-  seen.add(obj);
-
+  if (!isArray && proto !== Object.prototype && proto !== null)
+    throw new TypeError(`Composite: all objects must be {}, [], or Object.create(null), not: ${proto?.constructor?.name ?? "(unknown)"}`);
+  const target = reuse ? obj : (isArray ? [] : Object.create(proto));
   let hash = Math.imul(0x811c9dc5 ^ isArray, 0x01000193); //isArray is 1 for array, 0 for object
-  let dirty = false;
-  const keys = Reflect.ownKeys(obj);
-  let target;
-  for (let i = 0; i < keys.length; i++) {
-    const k = keys[i];
+
+  seen.add(obj);
+  for (let k of Reflect.ownKeys(obj)) {
+    if (k === '__proto__')
+      throw new TypeError(`Composite: Access to __proto__ is not allowed.`);
     const o = obj[k];
-    const v = compositeImpl(o, seen);
-    if (v === DIRTY) {
-      dirty = true;
-      continue;
-    }
-    if (!dirty) {
-      hash = hashPropertyKey(k, hash);
-      hash = (v && typeof v === 'object') ? Math.imul(hash ^ HASHCACHE.getHash(v), 0x01000193) : hashPrimitive(v, hash);
-    }
-    target ??= Object.assign(isArray ? [] : Object.create(proto), obj);
+    if (seen.has(o))
+      throw new TypeError(`Composite: Circular reference detected under key: ${String(k)}.`);
+    const v = CompositeImpl(o, reuse, seen);
+    hash = hashPropertyKey(k, hash);
+    hash = (v && typeof v === 'object') ? Math.imul(hash ^ HASHCACHE.getHash(v), 0x01000193) : hashPrimitive(v, hash);
     target[k] = v;
   }
-
   seen.delete(obj);
-  return dirty ? DIRTY : HASHCACHE.add(hash, Object.freeze(target ?? obj));
+  return HASHCACHE.add(hash, Object.freeze(target));
 }
 
 Composite.is = function is(v) {
