@@ -4,6 +4,38 @@
 <h1>Composite tests</h1>
 <p>Open the browser console for grouped results and the summary table.</p>
 <script type="module">
+  function runTests(tests) {
+    function printTest({ test, passed, error }) {
+      passed ?
+        console.log("PASS —", test) :
+        console.error("FAIL —", test, error || "Callback did not return true.");
+    }
+
+    function printGroup(group, results) {
+      results.every(result => result.passed) ?
+        console.groupCollapsed(group) :
+        console.group(group);
+      results.forEach(printTest);
+      console.groupEnd();
+    }
+
+    const results = Object.entries(tests).map(([group, cases]) => {
+      const groupResults = Object.entries(cases).map(([test, run]) => {
+        try {
+          return { test, passed: run() === true };
+        } catch (caught) {
+          return { test, error: String(caught) };
+        }
+      });
+      printGroup(group, groupResults);
+      return groupResults;
+    }).flat();
+
+    const failed = results.filter(result => !result.passed).length;
+    console.log(`Tests finished: ${results.length - failed} passed, ${failed} failed.`);
+    console.log(results);
+  }
+
   import { Composite } from "../composite.js";
 
   function throws(run, ErrorType = TypeError) {
@@ -217,34 +249,6 @@
     },
   };
 
-  function printTest({ test, passed, error }) {
-    passed ?
-      console.log("PASS —", test) :
-      console.error("FAIL —", test, error || "Callback did not return true.");
-  }
-
-  function printGroup(group, results) {
-    results.every(result => result.passed) ?
-      console.groupCollapsed(group) :
-      console.group(group);
-    results.forEach(printTest);
-    console.groupEnd();
-  }
-
-  const results = Object.entries(tests).map(([group, cases]) => {
-    const groupResults = Object.entries(cases).map(([test, run]) => {
-      try {
-        return { test, passed: run() === true };
-      } catch (caught) {
-        return { test, error: String(caught) };
-      }
-    });
-    printGroup(group, groupResults);
-    return groupResults;
-  }).flat();
-
-  const failed = results.filter(result => !result.passed).length;
-  console.log(`Composite tests finished: ${results.length - failed} passed, ${failed} failed.`);
   console.log("Accessors, proxies, modified built-in prototypes, and garbage-collection timing are not covered.");
-  console.log(results);
+  runTests(tests);
 </script>
