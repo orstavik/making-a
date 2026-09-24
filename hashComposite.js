@@ -1,5 +1,3 @@
-const f64 = new Float64Array(1);
-const u32 = new Uint32Array(f64.buffer);
 const HASHTAGS = {
   object: 0,
   array: 1,
@@ -10,36 +8,56 @@ const HASHTAGS = {
   string: 6,
   null: 7,
   undefined: 8,
+  symbol: 9,
   objectLiteral: 10,
   property: 11,
   function: 12,
+  NaN: 13,
 };
-function hashString(hash, str) {
+
+function hashString(str, hash = 0x811c9dc5) {
   for (let i = 0; i < str.length; i++)
     hash = Math.imul(hash ^ str.charCodeAt(i), 0x01000193);
   return hash;
 }
 
-function hashPrimitive(hash, v) {
+let i = 0;
+const StaticSymbols = new Map(), DynamicSymbols = new WeakMap();
+function hashSymbol(s, hash = 0x811c9dc5) {
+  let v = StaticSymbols.get(s) ?? DynamicSymbols.get(s);
+  if (!v)
+    Symbol.keyFor(s) !== undefined ? StaticSymbols.set(s, v = ++i) : DynamicSymbols.set(s, v = ++i);
+  return Math.imul(hash ^ v, 0x01000193);
+}
+
+const f64 = new Float64Array(1);
+const u32 = new Uint32Array(f64.buffer);
+function hashNumber(v, hash = 0x811c9dc5) {
+  if (Number.isInteger(v) && v >= 0 && v <= 0xFFFFFFFF && !Object.is(v, -0))
+    return Math.imul(hash ^ v, 0x01000193);
+  f64[0] = v;
+  hash = Math.imul(hash ^ u32[0], 0x01000193);
+  return Math.imul(hash ^ u32[1], 0x01000193);
+}
+
+function hashPrimitive(v, hash = 0x811c9dc5) {
   if (v === null) return Math.imul(hash ^ HASHTAGS.null, 0x01000193);
   if (v === undefined) return Math.imul(hash ^ HASHTAGS.undefined, 0x01000193);
   if (v === true) return Math.imul(hash ^ HASHTAGS.true, 0x01000193);
   if (v === false) return Math.imul(hash ^ HASHTAGS.false, 0x01000193);
+  if (Object.is(v, NaN)) return Math.imul(hash ^ HASHTAGS.NaN, 0x01000193);
 
   const t = typeof v;
-  hash = Math.imul(hash ^ (HASHTAGS[t] || 8), 0x01000193);
-  if (t === 'string')
-    return hashString(hash, v);
-  if (t === 'bigint')
-    return hashString(hash, v.toString());
-  if (t === 'number' && Number.isInteger(v) && v >= 0 && v <= 0xFFFFFFFF)
-    return Math.imul(hash ^ v, 0x01000193);
-  if (t === 'number') {
-    f64[0] = v;
-    hash = Math.imul(hash ^ u32[0], 0x01000193);
-    return Math.imul(hash ^ u32[1], 0x01000193);
-  }
-  throw new TypeError("Unsupported type for hashing: " + t + " with value: " + v);
+  if (!(t in HASHTAGS)) throw new TypeError("Unsupported type for hashing: " + t + " with value: " + v);
+  hash = Math.imul(hash ^ HASHTAGS[t], 0x01000193);
+  if (t === 'string') return hashString(v, hash);
+  if (t === 'bigint') return hashString(v.toString(), hash);
+  if (t === 'number') return hashNumber(v, hash);
+  if (t === 'symbol') return hashSymbol(v, hash);
+}
+function hashPropertyKey(key, hash = 0x811c9dc5) {
+  hash = Math.imul(hash ^ HASHTAGS.property, 0x01000193);
+  return typeof key === 'string' ? hashString(key, hash) : hashSymbol(key, hash);
 }
 
 class WeakHashMap {
@@ -50,10 +68,10 @@ class WeakHashMap {
     this.finale = new FinalizationRegistry(hash => this.delete(hash));
   }
   #sameSame(a, b) {
-    if (a === b)
+    if (Object.is(a, b))
       return true;
-    const ak = Object.keys(a);
-    const bk = Object.keys(b);
+    const ak = Reflect.ownKeys(a);
+    const bk = Reflect.ownKeys(b);
     if (ak.length !== bk.length)
       return false;
     for (let i = 0; i < ak.length; i++)
@@ -120,13 +138,12 @@ function compositeImpl(obj, seen) {
   const proto = Object.getPrototypeOf(obj);
   const isArray = proto === Array.prototype;
   if (!isArray && proto !== Object.prototype && proto !== null) return DIRTY;
-  if (Object.getOwnPropertySymbols(obj).length > 0) return DIRTY;
   if (seen.has(obj)) return DIRTY;
   seen.add(obj);
 
   let hash = Math.imul(0x811c9dc5 ^ isArray, 0x01000193); //isArray is 1 for array, 0 for object
   let dirty = false;
-  const keys = Object.keys(obj);
+  const keys = Reflect.ownKeys(obj);
   let target;
   for (let i = 0; i < keys.length; i++) {
     const k = keys[i];
@@ -137,14 +154,10 @@ function compositeImpl(obj, seen) {
       continue;
     }
     if (!dirty) {
-      hash = Math.imul(hash ^ HASHTAGS.property, 0x01000193);
-      hash = hashString(hash, k);
-      const t = typeof v;
-      hash = (v && t === 'object') ?
-        Math.imul(hash ^ HASHCACHE.getHash(v), 0x01000193) :
-        hashPrimitive(hash, v);
+      hash = hashPropertyKey(k, hash);
+      hash = (v && typeof v === 'object') ? Math.imul(hash ^ HASHCACHE.getHash(v), 0x01000193) : hashPrimitive(v, hash);
     }
-    target ??= Object.assign(Object.create(proto), obj);
+    target ??= Object.assign(isArray ? [] : Object.create(proto), obj);
     target[k] = v;
   }
 
@@ -155,6 +168,7 @@ function compositeImpl(obj, seen) {
 Composite.is = function is(v) {
   return v == null || typeof v === 'string' ||
     typeof v === 'number' || typeof v === 'boolean' ||
+    typeof v === 'symbol' ||
     typeof v === 'bigint' || HASHCACHE.getHash(v) !== undefined;
 }
 
