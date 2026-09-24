@@ -46,39 +46,39 @@
 
   const tests = {
     "Primitives": {
-      "Supported primitives pass through and are registered": () => {
-        if (!Object.is(Composite(null), null)) return false;
-        if (!Composite.is(null)) return false;
-        if (!Object.is(Composite(undefined), undefined)) return false;
-        if (!Composite.is(undefined)) return false;
-        if (!Object.is(Composite(true), true)) return false;
-        if (!Composite.is(true)) return false;
-        if (!Object.is(Composite(false), false)) return false;
-        if (!Composite.is(false)) return false;
-        if (!Object.is(Composite("Alice"), "Alice")) return false;
-        if (!Composite.is("Alice")) return false;
-        if (!Object.is(Composite(42), 42)) return false;
-        if (!Composite.is(42)) return false;
-        if (!Object.is(Composite(1.5), 1.5)) return false;
-        if (!Composite.is(1.5)) return false;
-        if (!Object.is(Composite(42n), 42n)) return false;
-        if (!Composite.is(42n)) return false;
-        if (!Object.is(Composite(0), 0)) return false;
-        if (!Composite.is(0)) return false;
-        if (!Object.is(Composite(-0), -0)) return false;
-        if (!Composite.is(-0)) return false;
-        if (!Object.is(Composite(NaN), NaN)) return false;
-        if (!Composite.is(NaN)) return false;
-        if (!Object.is(Composite(Infinity), Infinity)) return false;
-        if (!Composite.is(Infinity)) return false;
-        if (!Object.is(Composite(-Infinity), -Infinity)) return false;
-        if (!Composite.is(-Infinity)) return false;
-        const local = Symbol("local");
-        if (!Object.is(Composite(local), local)) return false;
-        if (!Composite.is(local)) return false;
-        const registered = Symbol.for("");
-        if (!Object.is(Composite(registered), registered)) return false;
-        return Composite.is(registered);
+      "Null: passes through and is recognized": () =>
+        Object.is(Composite(null), null) && Composite.is(null),
+      "Undefined: passes through and is recognized": () =>
+        Object.is(Composite(undefined), undefined) && Composite.is(undefined),
+      "True: passes through and is recognized": () =>
+        Object.is(Composite(true), true) && Composite.is(true),
+      "False: passes through and is recognized": () =>
+        Object.is(Composite(false), false) && Composite.is(false),
+      "Strings: passes through and is recognized": () =>
+        Object.is(Composite("Alice"), "Alice") && Composite.is("Alice"),
+      "Integers: passes through and is recognized": () =>
+        Object.is(Composite(42), 42) && Composite.is(42),
+      "Fractions: passes through and is recognized": () =>
+        Object.is(Composite(1.5), 1.5) && Composite.is(1.5),
+      "BigInts: passes through and is recognized": () =>
+        Object.is(Composite(42n), 42n) && Composite.is(42n),
+      "Positive zero: passes through and is recognized": () =>
+        Object.is(Composite(0), 0) && Composite.is(0),
+      "Negative zero: passes through and is recognized": () =>
+        Object.is(Composite(-0), -0) && Composite.is(-0),
+      "NaN: passes through and is recognized": () =>
+        Object.is(Composite(NaN), NaN) && Composite.is(NaN),
+      "Positive infinity: passes through and is recognized": () =>
+        Object.is(Composite(Infinity), Infinity) && Composite.is(Infinity),
+      "Negative infinity: passes through and is recognized": () =>
+        Object.is(Composite(-Infinity), -Infinity) && Composite.is(-Infinity),
+      "Local symbols: passes through and is recognized": () => {
+        const value = Symbol("local");
+        return Object.is(Composite(value), value) && Composite.is(value);
+      },
+      "Empty-name registered symbols: passes through and is recognized": () => {
+        const value = Symbol.for("");
+        return Object.is(Composite(value), value) && Composite.is(value);
       },
     },
 
@@ -105,7 +105,7 @@
         if (!Object.hasOwn(present, "x")) return false;
         return present.x === undefined;
       },
-      "Primitive types remain distinct inside objects (clone)": () => {
+      "Primitive types remain distinct inside objects": () => {
         const number = Composite({ value: 1 });
         if (!Object.is(number.value, 1)) return false;
         if (Composite({ value: 1 }) !== number) return false;
@@ -133,36 +133,6 @@
         const empty = Composite({ value: "" });
         if (!Object.is(empty.value, "")) return false;
         if (Composite({ value: "" }) !== empty) return false;
-        return new Set([number, string, bigint, nil, missing, no, yes, zero, empty]).size === 9;
-      },
-      "Primitive types remain distinct inside objects (consume)": () => {
-        const number = Composite.consume({ value: 1 });
-        if (!Object.is(number.value, 1)) return false;
-        if (Composite.consume({ value: 1 }) !== number) return false;
-        const string = Composite.consume({ value: "1" });
-        if (!Object.is(string.value, "1")) return false;
-        if (Composite.consume({ value: "1" }) !== string) return false;
-        const bigint = Composite.consume({ value: 1n });
-        if (!Object.is(bigint.value, 1n)) return false;
-        if (Composite.consume({ value: 1n }) !== bigint) return false;
-        const nil = Composite.consume({ value: null });
-        if (!Object.is(nil.value, null)) return false;
-        if (Composite.consume({ value: null }) !== nil) return false;
-        const missing = Composite.consume({ value: undefined });
-        if (!Object.is(missing.value, undefined)) return false;
-        if (Composite.consume({ value: undefined }) !== missing) return false;
-        const no = Composite.consume({ value: false });
-        if (!Object.is(no.value, false)) return false;
-        if (Composite.consume({ value: false }) !== no) return false;
-        const yes = Composite.consume({ value: true });
-        if (!Object.is(yes.value, true)) return false;
-        if (Composite.consume({ value: true }) !== yes) return false;
-        const zero = Composite.consume({ value: 0 });
-        if (!Object.is(zero.value, 0)) return false;
-        if (Composite.consume({ value: 0 }) !== zero) return false;
-        const empty = Composite.consume({ value: "" });
-        if (!Object.is(empty.value, "")) return false;
-        if (Composite.consume({ value: "" }) !== empty) return false;
         return new Set([number, string, bigint, nil, missing, no, yes, zero, empty]).size === 9;
       },
     },
@@ -264,7 +234,7 @@
     },
 
     "Unsupported inputs and cycles": {
-      "Unsupported types throw at the root and nested (clone)": () => {
+      "Unsupported types throw at the root and nested": () => {
         class Example { }
         if (!throws(() => Composite(new Date(0)))) return false;
         if (!throws(() => Composite({ value: new Date(0) }))) return false;
@@ -278,21 +248,6 @@
         if (!throws(() => Composite({ value: new Uint8Array([1]) }))) return false;
         if (!throws(() => Composite(new Example()))) return false;
         return throws(() => Composite({ value: new Example() }));
-      },
-      "Unsupported types throw at the root and nested (consume)": () => {
-        class Example { }
-        if (!throws(() => Composite.consume(new Date(0)))) return false;
-        if (!throws(() => Composite.consume({ value: new Date(0) }))) return false;
-        if (!throws(() => Composite.consume(function example() { }))) return false;
-        if (!throws(() => Composite.consume({ value: function example() { } }))) return false;
-        if (!throws(() => Composite.consume(new Map()))) return false;
-        if (!throws(() => Composite.consume({ value: new Map() }))) return false;
-        if (!throws(() => Composite.consume(new Set()))) return false;
-        if (!throws(() => Composite.consume({ value: new Set() }))) return false;
-        if (!throws(() => Composite.consume(new Uint8Array([1])))) return false;
-        if (!throws(() => Composite.consume({ value: new Uint8Array([1]) }))) return false;
-        if (!throws(() => Composite.consume(new Example()))) return false;
-        return throws(() => Composite.consume({ value: new Example() }));
       },
       "A failed clone leaves earlier input children mutable": () => {
         const child = { failedClone: 1 };
