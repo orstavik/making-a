@@ -217,28 +217,34 @@
     },
   };
 
-  const results = [];
-  for (const [group, cases] of Object.entries(tests)) {
-    console.group(group);
-    for (const [description, run] of Object.entries(cases)) {
-      let passed = false;
-      let error = "";
-      try {
-        passed = run() === true;
-      } catch (caught) {
-        error = String(caught);
-      }
-      results.push({ group, test: description, passed, error });
-      if (passed)
-        console.log("PASS —", description);
-      else
-        console.error("FAIL —", description, error || "Callback did not return true.");
-    }
+  function printTest({ test, passed, error }) {
+    passed ?
+      console.log("PASS —", test) :
+      console.error("FAIL —", test, error || "Callback did not return true.");
+  }
+
+  function printGroup(group, results) {
+    results.every(result => result.passed) ?
+      console.groupCollapsed(group) :
+      console.group(group);
+    results.forEach(printTest);
     console.groupEnd();
   }
 
-  console.table(results);
+  const results = Object.entries(tests).map(([group, cases]) => {
+    const groupResults = Object.entries(cases).map(([test, run]) => {
+      try {
+        return { test, passed: run() === true };
+      } catch (caught) {
+        return { test, error: String(caught) };
+      }
+    });
+    printGroup(group, groupResults);
+    return groupResults;
+  }).flat();
+
   const failed = results.filter(result => !result.passed).length;
   console.log(`Composite tests finished: ${results.length - failed} passed, ${failed} failed.`);
   console.log("Accessors, proxies, modified built-in prototypes, and garbage-collection timing are not covered.");
+  console.log(results);
 </script>
