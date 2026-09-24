@@ -36,7 +36,7 @@
     console.log(results);
   }
 
-  import { Composite } from "../composite.js";
+  import { Composite, WeakHashMap } from "../composite.js";
 
   function throws(run, ErrorType = TypeError) {
     try {
@@ -271,6 +271,74 @@
       "Signed zeros under symbol keys remain distinct": () => {
         const key = Symbol("zero");
         return Composite({ [key]: 0 }) !== Composite({ [key]: -0 });
+      },
+    },
+
+    "Hash collisions": {
+      "Different objects coexist under the same hash": () => {
+        const cache = new WeakHashMap();
+        const a = Object.freeze({ value: 1 });
+        const b = Object.freeze({ value: 2 });
+        const c = Object.freeze({ value: 3 });
+
+        if (cache.add(123, a) !== a) return false;
+        if (cache.add(123, b) !== b) return false;
+        if (cache.add(123, c) !== c) return false;
+
+        if (cache.getHash(a) !== 123) return false;
+        if (cache.getHash(b) !== 123) return false;
+        if (cache.getHash(c) !== 123) return false;
+
+        const objects = cache.getObj(123);
+        if (objects.length !== 3) return false;
+        if (objects[0] !== a) return false;d
+        if (objects[1] !== b) return false;
+        if (objects[2] !== c) return false;
+        return true;
+      },
+      "Equal objects reuse primary and collision entries without adding duplicates": () => {
+        const cache = new WeakHashMap();
+        const a = Object.freeze({ value: 1 });
+        const b = Object.freeze({ value: 2 });
+        const c = Object.freeze({ value: 3 });
+
+        if (cache.add(123, a) !== a) return false;
+        if (cache.add(123, b) !== b) return false;
+        if (cache.add(123, c) !== c) return false;
+
+        if (cache.add(123, Object.freeze({ value: 3 })) !== c) return false;
+        if (cache.add(123, Object.freeze({ value: 1 })) !== a) return false;
+        if (cache.add(123, Object.freeze({ value: 2 })) !== b) return false;
+        if (cache.add(123, Object.freeze({ value: 3 })) !== c) return false;
+        if (cache.getObj(123).length !== 3) return false;
+        return true;
+      },
+      "Symbol-keyed signed zeros differ and NaNs share despite equal hashes": () => {
+        const cache = new WeakHashMap();
+        const key = Symbol("collision");
+        const positiveZero = Object.freeze({ [key]: 0 });
+        const negativeZero = Object.freeze({ [key]: -0 });
+        const nan = Object.freeze({ [key]: NaN });
+
+        if (cache.add(123, positiveZero) !== positiveZero) return false;
+        if (cache.add(123, negativeZero) !== negativeZero) return false;
+        if (cache.add(123, nan) !== nan) return false;
+
+        if (cache.add(123, Object.freeze({ [key]: 0 })) !== positiveZero) return false;
+        if (cache.add(123, Object.freeze({ [key]: -0 })) !== negativeZero) return false;
+        if (cache.add(123, Object.freeze({ [key]: NaN })) !== nan) return false;
+        if (cache.getObj(123).length !== 3) return false;
+        return true;
+      },
+      "Arrays and objects with identical own properties remain distinct": () => {
+        const cache = new WeakHashMap();
+        const array = Object.freeze([1]);
+        const object = Object.freeze({ 0: 1, length: 1 });
+        if (cache.add(123, array) !== array) return false;
+        if (cache.add(123, object) !== object) return false;
+        if (cache.add(123, Object.freeze([1])) !== array) return false;
+        if (cache.add(123, Object.freeze({ 0: 1, length: 1 })) !== object) return false;
+        return true;
       },
     },
 

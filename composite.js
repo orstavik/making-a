@@ -60,7 +60,7 @@ function hashPropertyKey(key, hash = 0x811c9dc5) {
   return typeof key === 'string' ? hashString(key, hash) : hashSymbol(key, hash);
 }
 
-class WeakHashMap {
+export class WeakHashMap {
   constructor() {
     this.simpleHashToObj = new Map();
     this.objToHash = new WeakMap();
