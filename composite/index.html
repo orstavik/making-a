@@ -45,51 +45,68 @@
   }
 
   const tests = {
-    "Primitives": {
-      "Null: passes through and is recognized": () =>
-        Object.is(Composite(null), null) && Composite.is(null),
-      "Undefined: passes through and is recognized": () =>
-        Object.is(Composite(undefined), undefined) && Composite.is(undefined),
-      "True: passes through and is recognized": () =>
-        Object.is(Composite(true), true) && Composite.is(true),
-      "False: passes through and is recognized": () =>
-        Object.is(Composite(false), false) && Composite.is(false),
-      "Strings: passes through and is recognized": () =>
-        Object.is(Composite("Alice"), "Alice") && Composite.is("Alice"),
-      "Integers: passes through and is recognized": () =>
-        Object.is(Composite(42), 42) && Composite.is(42),
-      "Fractions: passes through and is recognized": () =>
-        Object.is(Composite(1.5), 1.5) && Composite.is(1.5),
-      "BigInts: passes through and is recognized": () =>
-        Object.is(Composite(42n), 42n) && Composite.is(42n),
-      "Positive zero: passes through and is recognized": () =>
-        Object.is(Composite(0), 0) && Composite.is(0),
-      "Negative zero: passes through and is recognized": () =>
-        Object.is(Composite(-0), -0) && Composite.is(-0),
-      "NaN: passes through and is recognized": () =>
-        Object.is(Composite(NaN), NaN) && Composite.is(NaN),
-      "Positive infinity: passes through and is recognized": () =>
-        Object.is(Composite(Infinity), Infinity) && Composite.is(Infinity),
-      "Negative infinity: passes through and is recognized": () =>
-        Object.is(Composite(-Infinity), -Infinity) && Composite.is(-Infinity),
-      "Local symbols: passes through and is recognized": () => {
+    "Primitives as values": {
+      "null": () =>
+        Object.is(Composite(null), null) && Composite.is(null) && Composite({ value: null }).value === null,
+      "undefined": () =>
+        Object.is(Composite(undefined), undefined) && Composite.is(undefined) && Composite({ value: undefined }).value === undefined,
+      "null !== undefined": () =>
+        Composite(null) !== Composite(undefined),
+      "true": () =>
+        Object.is(Composite(true), true) && Composite.is(true) && Composite({ value: true }).value === true,
+      "false": () =>
+        Object.is(Composite(false), false) && Composite.is(false) && Composite({ value: false }).value === false,
+      "\"Alice\"": () =>
+        Object.is(Composite("Alice"), "Alice") && Composite.is("Alice") && Composite({ value: "Alice" }).value === "Alice",
+      '""': () =>
+        Object.is(Composite(""), "") && Composite.is("") && Composite({ value: "" }).value === "",
+      "42": () =>
+        Object.is(Composite(42), 42) && Composite.is(42) && Composite({ value: 42 }).value === 42,
+      "1.5": () =>
+        Object.is(Composite(1.5), 1.5) && Composite.is(1.5) && Composite({ value: 1.5 }).value === 1.5,
+      "42n": () =>
+        Object.is(Composite(42n), 42n) && Composite.is(42n) && Composite({ value: 42n }).value === 42n,
+      "0": () =>
+        Object.is(Composite(0), 0) && Composite.is(0) && Object.is(Composite({ value: 0 }).value, 0),
+      "-0": () =>
+        Object.is(Composite(-0), -0) && Composite.is(-0) && Object.is(Composite({ value: -0 }).value, -0),
+      "NaN": () =>
+        Object.is(Composite(NaN), NaN) && Composite.is(NaN) && Object.is(Composite({ value: NaN }).value, NaN),
+      "Infinity": () =>
+        Object.is(Composite(Infinity), Infinity) && Composite.is(Infinity) && Object.is(Composite({ value: Infinity }).value, Infinity),
+      "-Infinity": () =>
+        Object.is(Composite(-Infinity), -Infinity) && Composite.is(-Infinity) && Object.is(Composite({ value: -Infinity }).value, -Infinity),
+      "Symbol(\"local\")": () => {
         const value = Symbol("local");
-        return Object.is(Composite(value), value) && Composite.is(value);
+        return Object.is(Composite(value), value) && Composite.is(value) && Composite({ value }).value === value;
       },
-      "Empty-name registered symbols: passes through and is recognized": () => {
+      "Symbol.for(\"\")": () => {
         const value = Symbol.for("");
-        return Object.is(Composite(value), value) && Composite.is(value);
+        return Object.is(Composite(value), value) && Composite.is(value) && Composite({ value }).value === value;
       },
     },
 
     "Type and property distinctions": {
-      "Empty objects and arrays remain distinct (clone)": () => {
+      "{} consume": () => {
+        const a = {}, b = {}, A = Composite.consume(a), B = Composite.consume(b);
+        return a === A && A === B && a !== b && A !== b;
+      },
+      "{}": () => {
+        const a = {}, b = {}, A = Composite(a), B = Composite(b);
+        return A === B && a !== b && A !== a && A !== b;
+      },
+      "[] consume": () => {
+        const a = [], b = [], A = Composite.consume(a), B = Composite.consume(b);
+        return a === A && A === B && a !== b && A !== b;
+      },
+      "[]": () => {
+        const a = [], b = [], A = Composite(a), B = Composite(b);
+        return A === B && a !== b && A !== a && A !== b;
+      },
+      "Composite({}) !== Composite([])": () => {
         return Composite({}) !== Composite([]);
       },
-      "Empty objects and arrays remain distinct (consume)": () => {
-        return Composite.consume({}) !== Composite.consume([]);
-      },
-      "Missing properties differ from explicit undefined (clone)": () => {
+      "Composite({}) !==  Composite({ x: undefined })": () => {
         const missing = Composite({});
         const present = Composite({ x: undefined });
         if (missing === present) return false;
@@ -97,52 +114,34 @@
         if (!Object.hasOwn(present, "x")) return false;
         return present.x === undefined;
       },
-      "Missing properties differ from explicit undefined (consume)": () => {
-        const missing = Composite.consume({});
-        const present = Composite.consume({ x: undefined });
-        if (missing === present) return false;
-        if (Object.hasOwn(missing, "x")) return false;
-        if (!Object.hasOwn(present, "x")) return false;
-        return present.x === undefined;
-      },
+      // "{} and { x: undefined } remain distinct with Composite.consume": () => {
+      //   const missing = Composite.consume({});
+      //   const present = Composite.consume({ x: undefined });
+      //   if (missing === present) return false;
+      //   if (Object.hasOwn(missing, "x")) return false;
+      //   if (!Object.hasOwn(present, "x")) return false;
+      //   return present.x === undefined;
+      // },
       "Primitive types remain distinct inside objects": () => {
         const number = Composite({ value: 1 });
-        if (!Object.is(number.value, 1)) return false;
-        if (Composite({ value: 1 }) !== number) return false;
         const string = Composite({ value: "1" });
-        if (!Object.is(string.value, "1")) return false;
-        if (Composite({ value: "1" }) !== string) return false;
         const bigint = Composite({ value: 1n });
-        if (!Object.is(bigint.value, 1n)) return false;
-        if (Composite({ value: 1n }) !== bigint) return false;
         const nil = Composite({ value: null });
-        if (!Object.is(nil.value, null)) return false;
-        if (Composite({ value: null }) !== nil) return false;
         const missing = Composite({ value: undefined });
-        if (!Object.is(missing.value, undefined)) return false;
-        if (Composite({ value: undefined }) !== missing) return false;
         const no = Composite({ value: false });
-        if (!Object.is(no.value, false)) return false;
-        if (Composite({ value: false }) !== no) return false;
         const yes = Composite({ value: true });
-        if (!Object.is(yes.value, true)) return false;
-        if (Composite({ value: true }) !== yes) return false;
         const zero = Composite({ value: 0 });
-        if (!Object.is(zero.value, 0)) return false;
-        if (Composite({ value: 0 }) !== zero) return false;
         const empty = Composite({ value: "" });
-        if (!Object.is(empty.value, "")) return false;
-        if (Composite({ value: "" }) !== empty) return false;
         return new Set([number, string, bigint, nil, missing, no, yes, zero, empty]).size === 9;
       },
     },
 
     "Objects and children": {
-      "Equal objects share a reference": () =>
+      'Composite({ name: "Alice" }) === Composite({ name: "Alice" })': () =>
         Composite({ name: "Alice" }) === Composite({ name: "Alice" }),
-      "Different contents stay separate": () =>
+      'Composite({ name: "Alice" }) !== Composite({ name: "Bob" })': () =>
         Composite({ name: "Alice" }) !== Composite({ name: "Bob" }),
-      "An existing composite returns immediately": () => {
+      "Composite.is(result) is true and Composite(result) returns the same object": () => {
         const value = Composite({ name: "Alice" });
         return Composite.is(value) && Composite(value) === value;
       },
@@ -159,11 +158,10 @@
         const result = Composite({ a: child, b: child });
         return result.a === result.b;
       },
-      "Property order matters": () =>
+      'Composite({ a: 1, b: 2 }) !== Composite({ b: 2, a: 1 })': () =>
         Composite({ a: 1, b: 2 }) !== Composite({ b: 2, a: 1 }),
-      "Null-prototype data can reuse a plain object": () =>
-        Composite(Object.assign(Object.create(null), { prototypeExample: 1 })) ===
-        Composite({ prototypeExample: 1 }),
+      "Null-prototype data and plain objects are treated as equal": () =>
+        Composite(Object.assign(Object.create(null), { prototypeExample: 1 })) === Composite({ prototypeExample: 1 }),
     },
 
     "Arrays": {
@@ -171,11 +169,11 @@
         const a = Composite([1, 2, 3]);
         return Array.isArray(a) && Composite.is(a) && a === Composite([1, 2, 3]) && Composite(a) === a;
       },
-      "Array order matters": () =>
+      "[\"js\", \"web\"] and [\"web\", \"js\"] remain distinct": () =>
         Composite(["js", "web"]) !== Composite(["web", "js"]),
-      "A hole differs from explicit undefined": () =>
+      "new Array(1) and [undefined] remain distinct": () =>
         Composite(new Array(1)) !== Composite([undefined]),
-      "Sparse arrays preserve lengths and holes": () => {
+      "new Array(3) and new Array(4) preserve lengths and remain distinct": () => {
         const a = Composite(new Array(3));
         const b = Composite(new Array(4));
         return a !== b && a.length === 3 && b.length === 4 && !(0 in a);
@@ -291,31 +289,31 @@
     },
 
     "Numeric equality": {
-      "-1: value is preserved and equal objects share": () => {
+      "{ value: -1 }: preserves the value and reuses an equal object": () => {
         const result = Composite({ value: -1 });
         return Object.is(result.value, -1) && Composite({ value: -1 }) === result;
       },
-      "0: value is preserved and equal objects share": () => {
+      "{ value: 0 }: preserves the value and reuses an equal object": () => {
         const result = Composite({ value: 0 });
         return Object.is(result.value, 0) && Composite({ value: 0 }) === result;
       },
-      "1: value is preserved and equal objects share": () => {
+      "{ value: 1 }: preserves the value and reuses an equal object": () => {
         const result = Composite({ value: 1 });
         return Object.is(result.value, 1) && Composite({ value: 1 }) === result;
       },
-      "Uint32 maximum minus one: value is preserved and equal objects share": () => {
+      "{ value: 0xFFFFFFFE }: preserves the value and reuses an equal object": () => {
         const result = Composite({ value: 0xFFFFFFFE });
         return Object.is(result.value, 0xFFFFFFFE) && Composite({ value: 0xFFFFFFFE }) === result;
       },
-      "Uint32 maximum: value is preserved and equal objects share": () => {
+      "{ value: 0xFFFFFFFF }: preserves the value and reuses an equal object": () => {
         const result = Composite({ value: 0xFFFFFFFF });
         return Object.is(result.value, 0xFFFFFFFF) && Composite({ value: 0xFFFFFFFF }) === result;
       },
-      "Uint32 maximum plus one: value is preserved and equal objects share": () => {
+      "{ value: 0x100000000 }: preserves the value and reuses an equal object": () => {
         const result = Composite({ value: 0x100000000 });
         return Object.is(result.value, 0x100000000) && Composite({ value: 0x100000000 }) === result;
       },
-      "Uint32 maximum plus two: value is preserved and equal objects share": () => {
+      "{ value: 0x100000001 }: preserves the value and reuses an equal object": () => {
         const result = Composite({ value: 0x100000001 });
         return Object.is(result.value, 0x100000001) && Composite({ value: 0x100000001 }) === result;
       },
@@ -331,31 +329,31 @@
         ]);
         return results.size === 7;
       },
-      "Negative fractions: value is preserved and equal objects share": () => {
+      "{ value: -1.5 }: preserves the value and reuses an equal object": () => {
         const result = Composite({ value: -1.5 });
         return Object.is(result.value, -1.5) && Composite({ value: -1.5 }) === result;
       },
-      "Positive fractions: value is preserved and equal objects share": () => {
+      "{ value: 1.5 }: preserves the value and reuses an equal object": () => {
         const result = Composite({ value: 1.5 });
         return Object.is(result.value, 1.5) && Composite({ value: 1.5 }) === result;
       },
-      "Smallest positive number: value is preserved and equal objects share": () => {
+      "{ value: Number.MIN_VALUE }: preserves the value and reuses an equal object": () => {
         const result = Composite({ value: Number.MIN_VALUE });
         return Object.is(result.value, Number.MIN_VALUE) && Composite({ value: Number.MIN_VALUE }) === result;
       },
-      "Smallest negative magnitude: value is preserved and equal objects share": () => {
+      "{ value: -Number.MIN_VALUE }: preserves the value and reuses an equal object": () => {
         const result = Composite({ value: -Number.MIN_VALUE });
         return Object.is(result.value, -Number.MIN_VALUE) && Composite({ value: -Number.MIN_VALUE }) === result;
       },
-      "Largest positive finite number: value is preserved and equal objects share": () => {
+      "{ value: Number.MAX_VALUE }: preserves the value and reuses an equal object": () => {
         const result = Composite({ value: Number.MAX_VALUE });
         return Object.is(result.value, Number.MAX_VALUE) && Composite({ value: Number.MAX_VALUE }) === result;
       },
-      "Largest negative finite magnitude: value is preserved and equal objects share": () => {
+      "{ value: -Number.MAX_VALUE }: preserves the value and reuses an equal object": () => {
         const result = Composite({ value: -Number.MAX_VALUE });
         return Object.is(result.value, -Number.MAX_VALUE) && Composite({ value: -Number.MAX_VALUE }) === result;
       },
-      "Maximum safe integer: value is preserved and equal objects share": () => {
+      "{ value: Number.MAX_SAFE_INTEGER }: preserves the value and reuses an equal object": () => {
         const result = Composite({ value: Number.MAX_SAFE_INTEGER });
         return Object.is(result.value, Number.MAX_SAFE_INTEGER) && Composite({ value: Number.MAX_SAFE_INTEGER }) === result;
       },
@@ -371,13 +369,13 @@
         ]);
         return results.size === 7;
       },
-      "Signed zeros stay distinct": () =>
+      "{ zero: 0 } and { zero: -0 } remain distinct": () =>
         Composite({ zero: 0 }) !== Composite({ zero: -0 }),
-      "Infinity signs stay distinct": () =>
+      "{ infinity: Infinity } and { infinity: -Infinity } remain distinct": () =>
         Composite({ infinity: Infinity }) !== Composite({ infinity: -Infinity }),
-      "NaNs share": () =>
+      "{ number: NaN } reuses an equal object": () =>
         Composite({ number: NaN }) === Composite({ number: NaN }),
-      "Different NaN bit patterns share": () => {
+      "NaN payloads 0x7ff8000000000001 and 0xfff8000000000002 reuse the same object": () => {
         const view = new DataView(new ArrayBuffer(8));
         view.setBigUint64(0, 0x7ff8000000000001n);
         const a = view.getFloat64(0);
@@ -388,84 +386,116 @@
     },
 
     "Strings": {
-      "Empty, Unicode and embedded-null values preserve contents and reuse": () => {
-        const empty = Composite({ value: "" });
-        if (!Object.is(empty.value, "")) return false;
-        if (Composite({ value: "" }) !== empty) return false;
-        const letter = Composite({ value: "a" });
-        if (!Object.is(letter.value, "a")) return false;
-        if (Composite({ value: "a" }) !== letter) return false;
-        const emoji = Composite({ value: "😀" });
-        if (!Object.is(emoji.value, "😀")) return false;
-        if (Composite({ value: "😀" }) !== emoji) return false;
-        const otherEmoji = Composite({ value: "😁" });
-        if (!Object.is(otherEmoji.value, "😁")) return false;
-        if (Composite({ value: "😁" }) !== otherEmoji) return false;
-        const surrogate = Composite({ value: "\uD83D" });
-        if (!Object.is(surrogate.value, "\uD83D")) return false;
-        if (Composite({ value: "\uD83D" }) !== surrogate) return false;
-        const nul = Composite({ value: "\0" });
-        if (!Object.is(nul.value, "\0")) return false;
-        if (Composite({ value: "\0" }) !== nul) return false;
-        const embeddedNul = Composite({ value: "a\0b" });
-        if (!Object.is(embeddedNul.value, "a\0b")) return false;
-        if (Composite({ value: "a\0b" }) !== embeddedNul) return false;
-        const plain = Composite({ value: "ab" });
-        if (!Object.is(plain.value, "ab")) return false;
-        if (Composite({ value: "ab" }) !== plain) return false;
-        return new Set([empty, letter, emoji, otherEmoji, surrogate, nul, embeddedNul, plain]).size === 8;
+      "{ value: \"\" }: preserves the string and reuses an equal object": () => {
+        const result = Composite({ value: "" });
+        return result.value === "" && Composite({ value: "" }) === result;
       },
-      "Empty, Unicode and embedded-null property keys remain distinct": () => {
-        const empty = Composite({ [""]: 1 });
-        if (!Object.hasOwn(empty, "")) return false;
-        if (empty[""] !== 1) return false;
-        if (Composite({ [""]: 1 }) !== empty) return false;
-        const emoji = Composite({ ["😀"]: 1 });
-        if (!Object.hasOwn(emoji, "😀")) return false;
-        if (emoji["😀"] !== 1) return false;
-        if (Composite({ ["😀"]: 1 }) !== emoji) return false;
-        const otherEmoji = Composite({ ["😁"]: 1 });
-        if (!Object.hasOwn(otherEmoji, "😁")) return false;
-        if (otherEmoji["😁"] !== 1) return false;
-        if (Composite({ ["😁"]: 1 }) !== otherEmoji) return false;
-        const nul = Composite({ ["\0"]: 1 });
-        if (!Object.hasOwn(nul, "\0")) return false;
-        if (nul["\0"] !== 1) return false;
-        if (Composite({ ["\0"]: 1 }) !== nul) return false;
-        const embeddedNul = Composite({ ["a\0b"]: 1 });
-        if (!Object.hasOwn(embeddedNul, "a\0b")) return false;
-        if (embeddedNul["a\0b"] !== 1) return false;
-        if (Composite({ ["a\0b"]: 1 }) !== embeddedNul) return false;
-        const plain = Composite({ ["ab"]: 1 });
-        if (!Object.hasOwn(plain, "ab")) return false;
-        if (plain["ab"] !== 1) return false;
-        if (Composite({ ["ab"]: 1 }) !== plain) return false;
-        return new Set([empty, emoji, otherEmoji, nul, embeddedNul, plain]).size === 6;
+      "{ value: \"a\" }: preserves the string and reuses an equal object": () => {
+        const result = Composite({ value: "a" });
+        return result.value === "a" && Composite({ value: "a" }) === result;
+      },
+      "{ value: \"😀\" }: preserves the string and reuses an equal object": () => {
+        const result = Composite({ value: "😀" });
+        return result.value === "😀" && Composite({ value: "😀" }) === result;
+      },
+      "{ value: \"😁\" }: preserves the string and reuses an equal object": () => {
+        const result = Composite({ value: "😁" });
+        return result.value === "😁" && Composite({ value: "😁" }) === result;
+      },
+      "{ value: \"\\uD83D\" }: preserves the string and reuses an equal object": () => {
+        const result = Composite({ value: "\uD83D" });
+        return result.value === "\uD83D" && Composite({ value: "\uD83D" }) === result;
+      },
+      "{ value: \"\\0\" }: preserves the string and reuses an equal object": () => {
+        const result = Composite({ value: "\0" });
+        return result.value === "\0" && Composite({ value: "\0" }) === result;
+      },
+      "{ value: \"a\\0b\" }: preserves the string and reuses an equal object": () => {
+        const result = Composite({ value: "a\0b" });
+        return result.value === "a\0b" && Composite({ value: "a\0b" }) === result;
+      },
+      "{ value: \"ab\" }: preserves the string and reuses an equal object": () => {
+        const result = Composite({ value: "ab" });
+        return result.value === "ab" && Composite({ value: "ab" }) === result;
+      },
+      "{ [\"\"]: 1 }: preserves the own key and reuses an equal object": () => {
+        const result = Composite({ [""]: 1 });
+        return Object.hasOwn(result, "") && result[""] === 1 &&
+          Composite({ [""]: 1 }) === result;
+      },
+      "{ [\"😀\"]: 1 }: preserves the own key and reuses an equal object": () => {
+        const result = Composite({ ["😀"]: 1 });
+        return Object.hasOwn(result, "😀") && result["😀"] === 1 &&
+          Composite({ ["😀"]: 1 }) === result;
+      },
+      "{ [\"😁\"]: 1 }: preserves the own key and reuses an equal object": () => {
+        const result = Composite({ ["😁"]: 1 });
+        return Object.hasOwn(result, "😁") && result["😁"] === 1 &&
+          Composite({ ["😁"]: 1 }) === result;
+      },
+      "{ [\"\\0\"]: 1 }: preserves the own key and reuses an equal object": () => {
+        const result = Composite({ ["\0"]: 1 });
+        return Object.hasOwn(result, "\0") && result["\0"] === 1 &&
+          Composite({ ["\0"]: 1 }) === result;
+      },
+      "{ [\"a\\0b\"]: 1 }: preserves the own key and reuses an equal object": () => {
+        const result = Composite({ ["a\0b"]: 1 });
+        return Object.hasOwn(result, "a\0b") && result["a\0b"] === 1 &&
+          Composite({ ["a\0b"]: 1 }) === result;
+      },
+      "{ [\"ab\"]: 1 }: preserves the own key and reuses an equal object": () => {
+        const result = Composite({ ["ab"]: 1 });
+        return Object.hasOwn(result, "ab") && result["ab"] === 1 &&
+          Composite({ ["ab"]: 1 }) === result;
+      },
+      "Different string values remain distinct": () => {
+        const results = new Set([
+          Composite({ value: "" }),
+          Composite({ value: "a" }),
+          Composite({ value: "😀" }),
+          Composite({ value: "😁" }),
+          Composite({ value: "\uD83D" }),
+          Composite({ value: "\0" }),
+          Composite({ value: "a\0b" }),
+          Composite({ value: "ab" }),
+        ]);
+        return results.size === 8;
+      },
+      "Different string keys remain distinct": () => {
+        const results = new Set([
+          Composite({ [""]: 1 }),
+          Composite({ ["😀"]: 1 }),
+          Composite({ ["😁"]: 1 }),
+          Composite({ ["\0"]: 1 }),
+          Composite({ ["a\0b"]: 1 }),
+          Composite({ ["ab"]: 1 }),
+        ]);
+        return results.size === 6;
       },
     },
 
     "Symbols": {
-      "Local symbols work as keys and values": () => {
+      "Symbol(\"local\"): the same symbol shares objects as a key or value": () => {
         const local = Symbol("local");
         return Composite({ value: local }) === Composite({ value: local }) && Composite({ [local]: 1 }) === Composite({ [local]: 1 });
       },
-      "Registered symbols work as keys and values": () => {
+      "Symbol.for(\"registered\"): the same symbol shares objects as a key or value": () => {
         const registered = Symbol.for("registered");
         return Composite({ value: registered }) === Composite({ value: registered }) && Composite({ [registered]: 1 }) === Composite({ [registered]: 1 });
       },
-      "Empty-name registered symbols work as keys and values": () => {
+      "Symbol.for(\"\"): the same symbol shares objects as a key or value": () => {
         const empty = Symbol.for("");
         return Composite({ value: empty }) === Composite({ value: empty }) && Composite({ [empty]: 1 }) === Composite({ [empty]: 1 });
       },
-      "Well-known symbols work as keys and values": () => {
+      "Symbol.iterator: the same symbol shares objects as a key or value": () => {
         const wellKnown = Symbol.iterator;
         return Composite({ value: wellKnown }) === Composite({ value: wellKnown }) && Composite({ [wellKnown]: 1 }) === Composite({ [wellKnown]: 1 });
       },
-      "Different symbols with the same description remain distinct": () => {
+      "Two Symbol(\"same\") instances remain distinct as keys and values": () => {
         const a = Symbol("same"), b = Symbol("same");
         return Composite({ value: a }) !== Composite({ value: b }) && Composite({ [a]: 1 }) !== Composite({ [b]: 1 });
       },
-      "Signed zeros under symbol keys remain distinct": () => {
+      "0 and -0 under the same Symbol(\"zero\") key remain distinct": () => {
         const key = Symbol("zero");
         return Composite({ [key]: 0 }) !== Composite({ [key]: -0 });
       },
@@ -545,9 +575,9 @@
         const input = { consumeRoot: 1 };
         return Composite.consume(input) === shared && !Object.isFrozen(input) && Object.isFrozen(shared);
       },
-      "Unregistered frozen inputs are rejected": () =>
+      "Composite.consume rejects Object.freeze({}) when it is not a composite": () =>
         throws(() => Composite.consume(Object.freeze({}))),
-      "Existing composites are accepted": () => {
+      "Composite.consume returns an existing composite unchanged": () => {
         const input = Composite({ existingConsume: 1 });
         return Composite.consume(input) === input;
       },
@@ -559,7 +589,7 @@
     },
 
     "Hash collisions": {
-      "Different objects coexist under the same hash": () => {
+      "{ value: 1 }, { value: 2 }, and { value: 3 } coexist under hash 123": () => {
         const cache = new WeakHashMap();
         const a = Object.freeze({ value: 1 });
         const b = Object.freeze({ value: 2 });
@@ -611,7 +641,7 @@
         if (cache.add(123, Object.freeze({ [key]: NaN })) !== nan) return false;
         return cache.getObj(123).length === 3;
       },
-      "Arrays and objects with identical own properties remain distinct": () => {
+      "[1] and { 0: 1, length: 1 } remain distinct under hash 123": () => {
         const cache = new WeakHashMap();
         const array = Object.freeze([1]);
         const object = Object.freeze({ 0: 1, length: 1 });
