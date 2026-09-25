@@ -146,15 +146,13 @@ Composite.consume = function consume(obj) {
   return CompositeImpl(obj, true);
 }
 
-function CompositeImpl(obj, reuse = false, seen = new Set()) {
+function CompositeImpl(obj, consume = false, seen = new Set()) {
   if (Composite.is(obj)) return obj;
-  if (reuse && Object.isFrozen(obj))
-    throw new TypeError("Composite.consume: Input is already frozen.");
   const proto = Object.getPrototypeOf(obj);
   const isArray = proto === Array.prototype;
   if (!isArray && proto !== Object.prototype && proto !== null)
     throw new TypeError(`Composite: all objects must be {}, [], or Object.create(null), not: ${proto?.constructor?.name ?? "(unknown)"}`);
-  const target = reuse ? obj : (isArray ? [] : Object.create(proto));
+  const target = consume ? obj : (isArray ? [] : Object.create(proto));
   let hash = Math.imul(0x811c9dc5 ^ isArray, 0x01000193); //isArray is 1 for array, 0 for object
 
   seen.add(obj);
@@ -164,11 +162,13 @@ function CompositeImpl(obj, reuse = false, seen = new Set()) {
     const o = obj[k];
     if (seen.has(o))
       throw new TypeError(`Composite: Circular reference detected under key: ${String(k)}.`);
-    const v = CompositeImpl(o, reuse, seen);
+    const v = CompositeImpl(o, consume, seen);
     hash = hashPropertyKey(k, hash);
     hash = (v && typeof v === 'object') ? Math.imul(hash ^ HASHCACHE.getHash(v), 0x01000193) : hashPrimitive(v, hash);
-    if (reuse && Object.is(v, target[k]))
+    if (consume && Object.is(v, target[k]))
       continue;
+    if (consume && Object.isFrozen(target))
+      throw new TypeError("Composite.consume: cannot consume an already frozen object that requires internal updates.");
     target[k] = v;
   }
   seen.delete(obj);
@@ -182,6 +182,43 @@ Composite.is = function is(v) {
     typeof v === 'number' || typeof v === 'boolean' ||
     typeof v === 'symbol' ||
     typeof v === 'bigint' || HASHCACHE.getHash(v) !== undefined;
+}
+
+function replaceObject(obj, key) {
+  if (obj && typeof obj === "object") {
+    const proto = Object.getPrototypeOf(obj);
+    const isArray = proto === Array.prototype;
+    if (!isArray && proto !== Object.prototype && proto !== null)
+      throw new TypeError(`Composite: all objects must be {}, [], or Object.create(null), not: ${proto?.constructor?.name ?? "(unknown)"}`);
+    return Object.assign(isArray ? [] : Object.create(proto), ...obj);
+  }
+  const isArrayIndex = typeof key !== "string" && (key = Number(key)) >= 0 && Number.isInteger(key) && String(key) === key;
+  return isArrayIndex ? [] : {};
+}
+function setImpl(obj, path, value) {
+  let root = obj = replaceObject(obj, path[0]);
+  for (let i = 0; i < path.length - 1; i++) {
+    const key = path[i];
+    if (key === "__proto__")
+      throw new TypeError("Composite: Access to __proto__ is not allowed.");
+    obj = obj[key] = replaceObject(obj[key], path[i + 1]);
+  }
+  obj[path[path.length - 1]] = value;
+  return root;
+}
+
+Composite.set = function set(root, path, value) {
+  if (!Array.isArray(path) || path.length < 1)
+    throw new TypeError("Composite.set: Path must be a non-empty array.");
+  return Composite.consume(setImpl(root, path, value));
+};
+
+Composite.from = function from(root) {
+  const at = path => new Proxy(() => { }, {
+    get: (_, key) => at([...path, key]),
+    apply: (_, __, [value]) => Composite.set(root, path, value)
+  });
+  return at([]);
 }
 
 /* Lens API paused while the composite/hash behavior is being settled.

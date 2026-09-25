@@ -554,11 +554,22 @@
           !(1 in result) && !(3 in result) && result[0] === child &&
           result[key] === child && Object.isFrozen(child) && Object.isFrozen(result);
       },
-      "Nested unregistered frozen objects are rejected": () => {
-        const child = Object.freeze({ marker: Symbol("frozen child") });
-        const input = { child };
-        return throws(() => Composite.consume(input)) &&
-          input.child === child && !Object.isFrozen(input) && !Composite.is(child);
+      "Nested unregistered frozen objects can be consumed in some cases": () => {
+        const frozen = Object.freeze({ child: { marker: Symbol("frozen child") } });
+        const notComposite = !Composite.is(frozen);
+        const composite = Composite.consume(frozen);
+        return notComposite && composite === frozen && Object.isFrozen(composite) && Composite.is(frozen);
+      },
+      "Frozen objects can be replaced when they are root": () => {
+        const overlap = Composite({ marker: "frozen child" });
+        const frozen = Object.freeze({ marker: "frozen child" });
+        const composite = Composite.consume(frozen);
+        return composite === overlap && composite !== frozen && Object.isFrozen(composite) && !Composite.is(frozen);
+      },
+      "Frozen objects might fail": () => {
+        const overlap = Composite({ marker: "brainfreeze" });
+        const frozen = Object.freeze({ child: { marker: "brainfreeze" } });
+        return throws(() => Composite.consume(frozen));
       },
       "Read-only properties reject child replacement": () => {
         const marker = Symbol("read-only child");
@@ -575,8 +586,6 @@
         const input = { consumeRoot: 1 };
         return Composite.consume(input) === shared && !Object.isFrozen(input) && Object.isFrozen(shared);
       },
-      "Composite.consume rejects Object.freeze({}) when it is not a composite": () =>
-        throws(() => Composite.consume(Object.freeze({}))),
       "Composite.consume returns an existing composite unchanged": () => {
         const input = Composite({ existingConsume: 1 });
         return Composite.consume(input) === input;
