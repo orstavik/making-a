@@ -190,7 +190,7 @@ function replaceObject(obj, key) {
     const isArray = proto === Array.prototype;
     if (!isArray && proto !== Object.prototype && proto !== null)
       throw new TypeError(`Composite: all objects must be {}, [], or Object.create(null), not: ${proto?.constructor?.name ?? "(unknown)"}`);
-    return Object.assign(isArray ? [] : Object.create(proto), ...obj);
+    return Object.assign(isArray ? [] : Object.create(proto), obj);
   }
   const isArrayIndex = typeof key !== "string" && (key = Number(key)) >= 0 && Number.isInteger(key) && String(key) === key;
   return isArrayIndex ? [] : {};
