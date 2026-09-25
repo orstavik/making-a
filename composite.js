@@ -167,6 +167,8 @@ function CompositeImpl(obj, reuse = false, seen = new Set()) {
     const v = CompositeImpl(o, reuse, seen);
     hash = hashPropertyKey(k, hash);
     hash = (v && typeof v === 'object') ? Math.imul(hash ^ HASHCACHE.getHash(v), 0x01000193) : hashPrimitive(v, hash);
+    if (reuse && Object.is(v, target[k]))
+      continue;
     target[k] = v;
   }
   seen.delete(obj);
