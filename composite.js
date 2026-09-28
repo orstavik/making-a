@@ -246,7 +246,7 @@ const Lense = FN => function (root) {
       apply(_, __, args) {
         if (spent) throw new Error("Proxy already consumed");
         spent = true;
-        return FN(root, path, args);
+        return Composite(FN(root, path, args));
       }
     });
   }
@@ -271,13 +271,13 @@ Composite.reduce = Lense((root, path, args) => setImpl(root, path, reduce.call(g
 //   return at([]);
 // }
 
-function resolvePath(obj, path, skips = 0) {
-  for (let i = 0, stop = path.length - skips; obj && i < stop; i++)
-    obj = obj[path[i]];
-  return typeof obj === 'object' ? obj : undefined;
-}
+// function resolvePath(obj, path, skips = 0) {
+//   for (let i = 0, stop = path.length - skips; obj && i < stop; i++)
+//     obj = obj[path[i]];
+//   return typeof obj === 'object' ? obj : undefined;
+// }
 
-const mutators = new Set(["copyWithin", "fill", "pop", "push", "reverse", "shift", "sort", "splice", "unshift"]);
+// const mutators = new Set(["copyWithin", "fill", "pop", "push", "reverse", "shift", "sort", "splice", "unshift"]);
 
 // function doApply(root, path, args) {
 //   //draft() means to return the root object. cannot contain any arguments.
