@@ -2,7 +2,7 @@
 <meta charset="utf-8">
 <title>Composite tests</title>
 <h1>Composite tests</h1>
-<p>Open the browser console for grouped results and the summary table.</p>
+<p id="summary">Open the browser console for grouped results.</p>
 <script type="module">
   function runTests(tests) {
     function printGroup(group, results) {
@@ -29,7 +29,9 @@
     }).flat();
 
     const failed = results.filter(result => !result.passed).length;
-    console.log(`Tests finished: ${results.length - failed} passed, ${failed} failed.`);
+    const summary = `Tests finished: ${results.length - failed} passed, ${failed} failed.`;
+    document.querySelector("#summary").textContent = summary;
+    console.log(summary);
     console.log(results);
   }
 
@@ -88,7 +90,7 @@
 
     "Type and property distinctions": {
       "{} consume": () => {
-        const a = {}, b = {}, A = Composite.consume(a), B = Composite.consume(b);
+        const a = {}, b = {}, A = Composite(a, true), B = Composite(b, true);
         return a === A && A === B && a !== b && A !== b;
       },
       "{}": () => {
@@ -96,7 +98,7 @@
         return A === B && a !== b && A !== a && A !== b;
       },
       "[] consume": () => {
-        const a = [], b = [], A = Composite.consume(a), B = Composite.consume(b);
+        const a = [], b = [], A = Composite(a, true), B = Composite(b, true);
         return a === A && A === B && a !== b && A !== b;
       },
       "[]": () => {
@@ -114,9 +116,9 @@
         if (!Object.hasOwn(present, "x")) return false;
         return present.x === undefined;
       },
-      // "{} and { x: undefined } remain distinct with Composite.consume": () => {
-      //   const missing = Composite.consume({});
-      //   const present = Composite.consume({ x: undefined });
+      // "{} and { x: undefined } remain distinct with consume = true": () => {
+      //   const missing = Composite({}, true);
+      //   const present = Composite({ x: undefined }, true);
       //   if (missing === present) return false;
       //   if (Object.hasOwn(missing, "x")) return false;
       //   if (!Object.hasOwn(present, "x")) return false;
@@ -231,6 +233,195 @@
       },
     },
 
+
+    "rawSet": {
+      "Replaces only the changed branch and freezes the result": () => {
+        const root = Composite({ user: { name: "Alice" }, tags: ["js"] });
+        const result = Composite.rawSet(root, ["user", "name"], "Bob");
+        return result === Composite({ user: { name: "Bob" }, tags: ["js"] }) &&
+          result !== root && result.user !== root.user && result.tags === root.tags &&
+          root.user.name === "Alice" && Object.isFrozen(result) && Object.isFrozen(result.user);
+      },
+      "An equal replacement reuses the root": () => {
+        const root = Composite({ user: { name: "Alice" } });
+        return Composite.rawSet(root, ["user"], { name: "Alice" }) === root;
+      },
+      "Creates missing objects and arrays from string indices": () =>
+        Composite.rawSet(Composite({}), ["users", "0", "name"], "Alice") ===
+        Composite({ users: [{ name: "Alice" }] }),
+      "Numeric indices create the same arrays as string indices": () => {
+        const root = Composite({});
+        return Composite.rawSet(root, ["users", 0, "name"], "Alice") ===
+          Composite.rawSet(root, ["users", "0", "name"], "Alice");
+      },
+      "Non-index strings create objects": () =>
+        ["01", "-1", "1.5", "4294967295", ""].every(key => {
+          const result = Composite.rawSet(undefined, [key], 1);
+          return !Array.isArray(result) && result[key] === 1;
+        }),
+      "Replaces primitive roots and intermediate values with containers": () =>
+        [null, undefined, false, 0, "text", 1n, Symbol("root")].every(value =>
+          Composite.rawSet(value, ["child", "value"], 2) === Composite({ child: { value: 2 } }) &&
+          Composite.rawSet(Composite({ child: value }), ["child", "value"], 2) ===
+            Composite({ child: { value: 2 } })),
+      "Supports symbol and empty-string path keys without changing the path": () => {
+        const key = Symbol("path");
+        const path = Object.freeze([key, ""]);
+        const result = Composite.rawSet(Composite({}), path, 3);
+        return result[key][""] === 3 && path.length === 2 && path[0] === key && path[1] === "";
+      },
+      "Clones supplied values by default": () => {
+        const value = { child: { marker: Symbol("raw clone") } };
+        const result = Composite.rawSet(Composite({}), ["value"], value);
+        return result.value !== value && result.value.child !== value.child &&
+          Object.isFrozen(result.value.child) && !Object.isFrozen(value) && !Object.isFrozen(value.child);
+      },
+      "Consumes supplied values when requested": () => {
+        const value = { child: { marker: Symbol("raw consume") } };
+        const result = Composite.rawSet(Composite({}), ["value"], value, true);
+        return result.value === value && Object.isFrozen(value) && Object.isFrozen(value.child);
+      },
+      "Reuses already composite values": () => {
+        const value = Composite({ marker: Symbol("raw shared") });
+        return Composite.rawSet(Composite({}), ["value"], value).value === value;
+      },
+      "Distinguishes setting undefined from deleting a property": () => {
+        const root = Composite({ value: 1, keep: 2 });
+        const present = Composite.rawSet(root, ["value"], undefined);
+        const removed = Composite.rawSet(root, ["value"], Composite.delete);
+        return Object.hasOwn(present, "value") && present.value === undefined &&
+          !Object.hasOwn(removed, "value") && removed.keep === 2 && root.value === 1;
+      },
+      "Deleting an absent property on an existing parent is a no-op": () => {
+        const root = Composite({ child: { keep: 1 } });
+        return Composite.rawSet(root, ["child", "missing"], Composite.delete) === root;
+      },
+      "Deletes symbol properties": () => {
+        const key = Symbol("delete");
+        const root = Composite({ [key]: 1 });
+        return !Object.hasOwn(Composite.rawSet(root, [key], Composite.delete), key) && root[key] === 1;
+      },
+      "Deleting an array element leaves a hole and preserves length": () => {
+        const root = Composite({ items: [1, 2, 3] });
+        const result = Composite.rawSet(root, ["items", 1], Composite.delete);
+        return result.items.length === 3 && !(1 in result.items) && result.items[2] === 3 && root.items[1] === 2;
+      },
+      "Array updates preserve trailing holes and extra properties": () => {
+        const key = Symbol("array metadata");
+        const items = [1];
+        items.length = 4;
+        items[key] = { marker: Symbol("metadata") };
+        const root = Composite(items);
+        const result = Composite.rawSet(root, [0], 2);
+        return Array.isArray(result) && result.length === 4 && !(3 in result) &&
+          result[key] === root[key] && root[0] === 1 && result[0] === 2;
+      },
+      //should we preserve non-enumerable properties on consumed composites?
+      "Updates preserve non-enumerable data on consumed composites": () => {
+        const input = Object.defineProperty({ value: 1 }, "hidden", {
+          value: Symbol("hidden data"), enumerable: false,
+        });
+        const root = Composite(input, true);
+        const result = Composite.rawSet(root, ["value"], 2);
+        return Object.hasOwn(result, "hidden") && result.hidden === root.hidden && result.value === 2;
+      },
+      "Rejects non-composite roots": () =>
+        [{}, [], Object.freeze({}), new Date(0), () => {}].every(root =>
+          throws(() => Composite.rawSet(root, ["value"], 1))),
+      "Rejects empty and non-array paths": () =>
+        [[], "value", null, undefined, { 0: "value", length: 1 }].every(path =>
+          throws(() => Composite.rawSet(Composite({}), path, 1))),
+      "Rejects __proto__ at every path position": () =>
+        [["__proto__"], ["__proto__", "value"], ["child", "__proto__", "value"]].every(path =>
+          throws(() => Composite.rawSet(Composite({}), path, 1))),
+      "Rejects unsupported and cyclic replacement values": () => {
+        const cyclic = {};
+        cyclic.self = cyclic;
+        const root = Composite({ value: 1 });
+        return [new Date(0), () => {}, cyclic].every(value =>
+          throws(() => Composite.rawSet(root, ["value"], value))) && root.value === 1;
+      },
+    },
+
+    "Set and transform lenses": {
+      "set updates nested array elements": () => {
+        const root = Composite({ users: [{ name: "Alice" }], keep: { value: 1 } });
+        const result = Composite.set(root).users[0].name("Bob");
+        return result.users[0].name === "Bob" && root.users[0].name === "Alice" &&
+          result.keep === root.keep && Object.isFrozen(result.users[0]);
+      },
+      "set supports symbols and function-like property names": () => {
+        const key = Symbol("lens key");
+        return Composite.set(Composite({}))[key][""](2)[key][""] === 2 &&
+          ["name", "length", "call", "apply", "then"].every(name =>
+            Composite.set(Composite({}))[name](3)[name] === 3);
+      },
+      "set creates missing arrays": () =>
+        Composite.set(Composite({})).items[0].value(2) === Composite({ items: [{ value: 2 }] }),
+      "set accepts undefined and the deletion sentinel": () => {
+        const root = Composite({ value: 1 });
+        const result = Composite.set(root).value(undefined);
+        return Object.hasOwn(result, "value") && result.value === undefined &&
+          !Object.hasOwn(Composite.set(root).value(Composite.delete), "value");
+      },
+      "set clones values by default and consumes them when requested": () => {
+        const value = { child: { marker: Symbol("set consume") } };
+        const cloned = Composite.set(Composite({})).value(value);
+        const mutable = !Object.isFrozen(value) && !Object.isFrozen(value.child);
+        // A fresh marker avoids an existing canonical value replacing the consumed input.
+        const consumed = { child: { marker: Symbol("set consume") } };
+        const result = Composite.set(Composite({}), true).value(consumed);
+        return cloned.value !== value && mutable && result.value === consumed && Object.isFrozen(consumed.child);
+      },
+      "transform receives the current frozen value exactly once": () => {
+        const root = Composite({ user: { age: 20 }, keep: [1] });
+        let calls = 0, received;
+        const result = Composite.transform(root).user(value => {
+          calls++;
+          received = value;
+          return { ...value, age: value.age + 1 };
+        });
+        return calls === 1 && received === root.user && Object.isFrozen(received) &&
+          result.user.age === 21 && root.user.age === 20 && result.keep === root.keep;
+      },
+      "An identity transform reuses the root": () => {
+        const root = Composite({ items: [1, 2] });
+        return Composite.transform(root).items(value => value) === root;
+      },
+      "transform can initialize missing paths": () =>
+        Composite.transform(Composite({})).user.age(value => (value ?? 0) + 1) ===
+          Composite({ user: { age: 1 } }),
+      "transform can delete a property": () =>
+        !Object.hasOwn(Composite.transform(Composite({ value: 1 })).value(() => Composite.delete), "value"),
+      "transform clones or consumes its returned value": () => {
+        const root = Composite({ value: 1 });
+        const value = { child: { marker: Symbol("transform clone") } };
+        const cloned = Composite.transform(root).value(() => value);
+        const consumed = { child: { marker: Symbol("transform consume") } };
+        const result = Composite.transform(root, true).value(() => consumed);
+        return cloned.value !== value && !Object.isFrozen(value.child) &&
+          result.value === consumed && Object.isFrozen(consumed.child);
+      },
+      "set and transform require exactly one argument": () =>
+        ["set", "transform"].every(name => {
+          const root = Composite({ value: 1 });
+          return throws(() => Composite[name](root).value()) &&
+            throws(() => Composite[name](root).value(() => 2, 3));
+        }),
+      "transform rejects non-callable callbacks": () =>
+        throws(() => Composite.transform(Composite({ value: 1 })).value(2)),
+      "Callback errors propagate without changing the root": () => {
+        const root = Composite({ value: 1 });
+        const expected = new Error("callback failure");
+        try {
+          Composite.transform(root).value(() => { throw expected; });
+          return false;
+        } catch (error) {
+          return error === expected && root.value === 1;
+        }
+      },
+    },
+
     "Unsupported inputs and cycles": {
       "Unsupported types throw at the root and nested": () => {
         class Example { }
@@ -261,7 +452,7 @@
       "Direct cycles throw (consume)": () => {
         const input = {};
         input.self = input;
-        return throws(() => Composite.consume(input));
+        return throws(() => Composite(input, true));
       },
       "Indirect cycles throw (clone)": () => {
         const a = {};
@@ -273,7 +464,7 @@
         const a = {};
         const b = { a };
         a.b = b;
-        return throws(() => Composite.consume(a));
+        return throws(() => Composite(a, true));
       },
       "Symbol-keyed cycles throw": () => {
         const input = {};
@@ -284,7 +475,7 @@
         return throws(() => Composite(JSON.parse('{"__proto__": 1}')));
       },
       "Own __proto__ properties are rejected (consume)": () => {
-        return throws(() => Composite.consume(JSON.parse('{"__proto__": 1}')));
+        return throws(() => Composite(JSON.parse('{"__proto__": 1}'), true));
       },
     },
 
@@ -505,7 +696,7 @@
       "Fresh inputs and children are reused and frozen": () => {
         const child = { consumeExample: Symbol("unique") };
         const input = { child };
-        const result = Composite.consume(input);
+        const result = Composite(input, true);
         return result === input && result.child === child &&
           Object.isFrozen(input) && Object.isFrozen(child);
       },
@@ -513,14 +704,14 @@
         const shared = Composite({ consumeShared: "Carol" });
         const original = { consumeShared: "Carol" };
         const input = { child: original };
-        const result = Composite.consume(input);
+        const result = Composite(input, true);
         return input.child === shared && result.child === shared && !Object.isFrozen(original) && Object.isFrozen(shared);
       },
       "Shared children are reused without a cached equivalent": () => {
         const marker = Symbol("consume alias");
         const child = { marker };
         const input = { a: child, b: { child } };
-        const result = Composite.consume(input);
+        const result = Composite(input, true);
         if (result !== input) return false;
         if (result.a !== result.b.child) return false;
         if (result.a !== child) return false;
@@ -534,7 +725,7 @@
         const cached = Composite({ marker });
         const child = { marker };
         const input = { a: child, b: { child } };
-        const result = Composite.consume(input);
+        const result = Composite(input, true);
         if (result !== input) return false;
         if (result.a !== result.b.child) return false;
         if (result.a !== cached) return false;
@@ -549,7 +740,7 @@
         const input = [child];
         input.length = 4;
         input[key] = child;
-        const result = Composite.consume(input);
+        const result = Composite(input, true);
         return result === input && Array.isArray(result) && result.length === 4 &&
           !(1 in result) && !(3 in result) && result[0] === child &&
           result[key] === child && Object.isFrozen(child) && Object.isFrozen(result);
@@ -557,19 +748,19 @@
       "Nested unregistered frozen objects can be consumed in some cases": () => {
         const frozen = Object.freeze({ child: { marker: Symbol("frozen child") } });
         const notComposite = !Composite.is(frozen);
-        const composite = Composite.consume(frozen);
+        const composite = Composite(frozen, true);
         return notComposite && composite === frozen && Object.isFrozen(composite) && Composite.is(frozen);
       },
       "Frozen objects can be replaced when they are root": () => {
         const overlap = Composite({ marker: "frozen child" });
         const frozen = Object.freeze({ marker: "frozen child" });
-        const composite = Composite.consume(frozen);
+        const composite = Composite(frozen, true);
         return composite === overlap && composite !== frozen && Object.isFrozen(composite) && !Composite.is(frozen);
       },
       "Frozen objects might fail": () => {
         const overlap = Composite({ marker: "brainfreeze" });
         const frozen = Object.freeze({ child: { marker: "brainfreeze" } });
-        return throws(() => Composite.consume(frozen));
+        return throws(() => Composite(frozen, true));
       },
       "Read-only properties reject child replacement": () => {
         const marker = Symbol("read-only child");
@@ -578,21 +769,21 @@
         const input = Object.defineProperty({}, "child", {
           value: child, enumerable: true, configurable: true, writable: false,
         });
-        return throws(() => Composite.consume(input)) &&
+        return throws(() => Composite(input, true)) &&
           input.child === child && !Object.isFrozen(input) && !Object.isFrozen(child);
       },
       "A cached root may replace the input": () => {
         const shared = Composite({ consumeRoot: 1 });
         const input = { consumeRoot: 1 };
-        return Composite.consume(input) === shared && !Object.isFrozen(input) && Object.isFrozen(shared);
+        return Composite(input, true) === shared && !Object.isFrozen(input) && Object.isFrozen(shared);
       },
-      "Composite.consume returns an existing composite unchanged": () => {
+      "Composite(input, true) returns an existing composite unchanged": () => {
         const input = Composite({ existingConsume: 1 });
-        return Composite.consume(input) === input;
+        return Composite(input, true) === input;
       },
       "Errors may leave earlier children frozen": () => {
         const input = { child: { partialConsume: 1 }, invalid: new Date(0) };
-        return throws(() => Composite.consume(input)) &&
+        return throws(() => Composite(input, true)) &&
           Object.isFrozen(input.child) && !Object.isFrozen(input);
       },
     },
@@ -661,6 +852,120 @@
       },
     },
   };
+
+
+  // Explicit expected results catch mutators accidentally storing their native return values.
+  const arrayLensCases = {
+    map: { args: [value => value * 2], expected: [6, 2, 4] },
+    reduce: { args: [(sum, value) => sum + value, 10], expected: 16 },
+    flatMap: { args: [value => [value, -value]], expected: [3, -3, 1, -1, 2, -2] },
+    filter: { args: [value => value > 1], expected: [3, 2] },
+    reduceRight: { args: [(text, value) => text + value, ""], expected: "213" },
+    sort: { args: [(a, b) => a - b], expected: [1, 2, 3] },
+    reverse: { args: [], expected: [2, 1, 3] },
+    fill: { args: [9, 1, 2], expected: [3, 9, 2] },
+    copyWithin: { args: [1, 0, 2], expected: [3, 3, 1] },
+    push: { args: [4, 5], expected: [3, 1, 2, 4, 5] },
+    pop: { args: [], expected: [3, 1] },
+    shift: { args: [], expected: [1, 2] },
+    unshift: { args: [4, 5], expected: [4, 5, 3, 1, 2] },
+    splice: { args: [1, 1, 8, 9], expected: [3, 8, 9, 2] },
+  };
+  for (const [name, { args, expected }] of Object.entries(arrayLensCases)) {
+    tests[`${name} lens`] = {
+      "Updates a nested array and preserves the original and sibling branches": () => {
+        const root = Composite({ nested: { items: [3, 1, 2] }, keep: { value: 1 } });
+        const result = Composite[name](root).nested.items(...args);
+        return Object.is(result.nested.items, Composite(expected)) && result !== root &&
+          result.nested !== root.nested && result.keep === root.keep &&
+          root.nested.items === Composite([3, 1, 2]) &&
+          Object.isFrozen(result) && Object.isFrozen(result.nested) &&
+          Composite.is(result.nested.items) &&
+          (!Array.isArray(result.nested.items) || Object.isFrozen(result.nested.items));
+      },
+      "Rejects missing and non-array targets": () =>
+        [undefined, null, 1, "abc", { 0: 1, length: 1 }].every(items =>
+          throws(() => Composite[name](Composite({ items })).items(...args))),
+    };
+  }
+
+  tests["Array lens edge cases"] = {
+    "map passes index, original array, and thisArg to its callback": () => {
+      const root = Composite({ items: [3, 1, 2] });
+      const context = { offset: 10 };
+      let calls = 0, valid = true;
+      const result = Composite.map(root).items(function (value, index, array) {
+        calls++;
+        valid &&= this === context && array === root.items && Object.isFrozen(array);
+        return value + index + this.offset;
+      }, context);
+      return valid && calls === 3 && result.items === Composite([13, 12, 14]);
+    },
+    "map and reverse preserve sparse array holes": () => {
+      const items = [1, , 3];
+      const root = Composite({ items });
+      let calls = 0;
+      const mapped = Composite.map(root).items(value => { calls++; return value * 2; });
+      const reversed = Composite.reverse(root).items();
+      return calls === 2 && mapped.items === Composite([2, , 6]) &&
+        reversed.items === Composite([3, , 1]) && root.items === Composite(items);
+    },
+    "Reducers honor omitted initial values and traversal order": () => {
+      const root = Composite({ items: [3, 1, 2] });
+      return Composite.reduce(root).items((a, b) => a - b).items === 0 &&
+        Composite.reduceRight(root).items((a, b) => a - b).items === -2;
+    },
+    "Empty reductions require an initial value": () =>
+      ["reduce", "reduceRight"].every(name => {
+        const root = Composite({ items: [] });
+        return throws(() => Composite[name](root).items((a, b) => a + b)) &&
+          Composite[name](root).items((a, b) => a + b, 7).items === 7;
+      }),
+    "No-op array operations reuse the root": () => {
+      const root = Composite({ items: [1, 2, 3] });
+      return Composite.map(root).items(value => value) === root &&
+        Composite.filter(root).items(() => true) === root &&
+        Composite.sort(root).items((a, b) => a - b) === root &&
+        Composite.push(root).items() === root && Composite.splice(root).items(1, 0) === root;
+    },
+    "pop and shift keep empty arrays as arrays": () => {
+      const root = Composite({ items: [] });
+      return Composite.pop(root).items() === root && Composite.shift(root).items() === root;
+    },
+    "Inserted objects are cloned by default and consumed on request": () => {
+      const root = Composite({ items: [] });
+      const value = { child: { marker: Symbol("push clone") } };
+      const cloned = Composite.push(root).items(value);
+      const consumed = { child: { marker: Symbol("push consume") } };
+      const result = Composite.push(root, true).items(consumed);
+      return cloned.items[0] !== value && !Object.isFrozen(value.child) &&
+        result.items[0] === consumed && Object.isFrozen(consumed.child) && root.items.length === 0;
+    },
+  };
+
+  for (const [name, args] of Object.entries({
+    set: [[4]], transform: [() => [4]],
+    ...Object.fromEntries(Object.entries(arrayLensCases).map(([name, test]) => [name, test.args])),
+  })) {
+    tests[`${name} lens lifecycle`] = {
+      "Rejects a non-composite root before returning a proxy": () =>
+        throws(() => Composite[name]({ items: [] })),
+      "Rejects calls without a property path": () =>
+        throws(() => Composite[name](Composite([3, 1, 2]))(...args)),
+      "Consuming one branch invalidates the proxy and all derived branches": () => {
+        const lens = Composite[name](Composite({ items: [3, 1, 2], other: [3, 1, 2] }));
+        const items = lens.items, other = lens.other;
+        items(...args);
+        return throws(() => items(...args), Error) && throws(() => other(...args), Error) &&
+          throws(() => lens.items, Error) && throws(() => items.child, Error);
+      },
+      "A failed call also consumes the lens": () => {
+        const lens = Composite[name](Composite({ items: [3, 1, 2] }));
+        if (!throws(() => lens(...args))) return false;
+        return throws(() => lens.items, Error);
+      },
+    };
+  }
 
   console.log("Accessors, proxies, modified built-in prototypes, and garbage-collection timing are not covered.");
   runTests(tests);
