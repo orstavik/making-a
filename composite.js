@@ -271,7 +271,7 @@ for (const name of PureArrayFns) {
   Composite[name] = Lense((root, path, args) => {
     const arr = getImpl(root, path);
     if (!Array.isArray(arr)) throw new TypeError("Composite: Target must be an array in Composite.operations.");
-    return arr[name](...args);
+    return Array.prototype[name].call(arr, ...args);
   });
 }
 const DirtyArrayFns = ["sort", "reverse", "fill", "copyWithin", "push", "pop", "shift", "unshift", "splice"];
@@ -279,8 +279,8 @@ for (const name of DirtyArrayFns) {
   Composite[name] = Lense((root, path, args) => {
     const arr = getImpl(root, path);
     if (!Array.isArray(arr)) throw new TypeError("Composite: Target must be an array in Composite.operations.");
-    const copy = arr.slice();
-    copy[name](...args);
+    const copy = replaceObjectInsideCompositable(arr, "ignore", false);
+    Array.prototype[name].call(copy, ...args);
     return copy;
   });
 }
