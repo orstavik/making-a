@@ -176,13 +176,11 @@ Composite.is = function is(v) {
     typeof v === 'bigint' || HASHCACHE.getHash(v) !== undefined;
 }
 
-function getImpl(obj, path) {
-  for (let i = 0; obj != null && i < path.length; i++)
+function getImpl(obj, path, end = path.length) {
+  for (let i = 0; obj != null && i < end; i++)
     obj = obj[path[i]];
   return obj;
 }
-
-Composite.delete = Symbol("Composite.delete");
 
 function replaceObjectInsideCompositable(obj, nextKey, reuseNonFrozen) {
   if (obj && typeof obj === "object") {
@@ -211,9 +209,7 @@ function setImpl(obj, path, value, consume) {
     obj = obj[key] = replaceObjectInsideCompositable(obj[key], path[i + 1], consume);
   }
   if (path[path.length - 1] === "__proto__") throw new TypeError("Composite: Access to __proto__ is not allowed.");
-  value === Composite.delete ?
-    delete obj[path[path.length - 1]] :
-    obj[path[path.length - 1]] = value;
+  obj[path[path.length - 1]] = value;
   return root;
 }
 
@@ -223,7 +219,22 @@ Composite.rawSet = function set(root, path, value, consumeValue = false) {
   return Composite(setImpl(root, path, Composite(value, consumeValue), true));
 };
 
-const Lense = FN => function (root, consumeValue = false) {
+Composite.rawDelete = function rawDelete(root, path) {
+  if (!Composite.is(root)) throw new TypeError("Composite: Root must be a composite.");
+  if (!Array.isArray(path) || path.length < 1) throw new TypeError("Composite: Path must be a non-empty array.");
+  if (path.includes("__proto__")) throw new TypeError("Composite: Access to __proto__ is not allowed.");
+  const parent = path.length > 1 ? getImpl(root, path, path.length - 1) : root;
+  const key = path[path.length - 1];
+  if (parent == null || typeof parent !== "object" || !Object.hasOwn(parent, key))
+    return root;
+  const clone = replaceObjectInsideCompositable(parent, "ignore", false);
+  delete clone[key];
+  if (path.length === 1)
+    return Composite(clone, true);
+  return Composite.rawSet(root, path.slice(0, -1), clone, true);
+};
+
+const Lense = (FN, skip) => function (root, consumeValue = false) {
   if (!Composite.is(root)) throw new TypeError("Composite: Root must be a composite in Composite.operations.");
   let spent = false;
   function proxy(path = []) {
@@ -235,6 +246,8 @@ const Lense = FN => function (root, consumeValue = false) {
       apply(_, __, args) {
         if (spent) throw new Error("Proxy already consumed");
         spent = true;
+        if (skip)
+          return FN(root, path, args);
         return Composite.rawSet(root, path, FN(root, path, args), consumeValue);
       }
     });
@@ -246,6 +259,10 @@ Composite.set = Lense((root, path, args) => {
   if (args.length !== 1) throw new TypeError("Composite.set: Only one argument is allowed.");
   return args[0]
 });
+Composite.delete = Lense((root, path, args) => {
+  if (args.length !== 0) throw new TypeError("Composite.delete: No arguments are allowed.");
+  return Composite.rawDelete(root, path);
+}, true);
 Composite.transform = Lense((root, path, args) => {
   if (args.length !== 1) throw new TypeError("Composite.transform: Only one argument is allowed.");
   return args[0](getImpl(root, path));

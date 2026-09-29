@@ -263,7 +263,7 @@
         [null, undefined, false, 0, "text", 1n, Symbol("root")].every(value =>
           Composite.rawSet(value, ["child", "value"], 2) === Composite({ child: { value: 2 } }) &&
           Composite.rawSet(Composite({ child: value }), ["child", "value"], 2) ===
-            Composite({ child: { value: 2 } })),
+          Composite({ child: { value: 2 } })),
       "Supports symbol and empty-string path keys without changing the path": () => {
         const key = Symbol("path");
         const path = Object.freeze([key, ""]);
@@ -288,22 +288,22 @@
       "Distinguishes setting undefined from deleting a property": () => {
         const root = Composite({ value: 1, keep: 2 });
         const present = Composite.rawSet(root, ["value"], undefined);
-        const removed = Composite.rawSet(root, ["value"], Composite.delete);
+        const removed = Composite.rawDelete(root, ["value"]);
         return Object.hasOwn(present, "value") && present.value === undefined &&
           !Object.hasOwn(removed, "value") && removed.keep === 2 && root.value === 1;
       },
       "Deleting an absent property on an existing parent is a no-op": () => {
         const root = Composite({ child: { keep: 1 } });
-        return Composite.rawSet(root, ["child", "missing"], Composite.delete) === root;
+        return Composite.rawDelete(root, ["child", "missing"]) === root;
       },
       "Deletes symbol properties": () => {
         const key = Symbol("delete");
         const root = Composite({ [key]: 1 });
-        return !Object.hasOwn(Composite.rawSet(root, [key], Composite.delete), key) && root[key] === 1;
+        return !Object.hasOwn(Composite.rawDelete(root, [key]), key) && root[key] === 1;
       },
       "Deleting an array element leaves a hole and preserves length": () => {
         const root = Composite({ items: [1, 2, 3] });
-        const result = Composite.rawSet(root, ["items", 1], Composite.delete);
+        const result = Composite.rawDelete(root, ["items", 1]);
         return result.items.length === 3 && !(1 in result.items) && result.items[2] === 3 && root.items[1] === 2;
       },
       "Array updates preserve trailing holes and extra properties": () => {
@@ -326,7 +326,7 @@
         return Object.hasOwn(result, "hidden") && result.hidden === root.hidden && result.value === 2;
       },
       "Rejects non-composite roots": () =>
-        [{}, [], Object.freeze({}), new Date(0), () => {}].every(root =>
+        [{}, [], Object.freeze({}), new Date(0), () => { }].every(root =>
           throws(() => Composite.rawSet(root, ["value"], 1))),
       "Rejects empty and non-array paths": () =>
         [[], "value", null, undefined, { 0: "value", length: 1 }].every(path =>
@@ -338,7 +338,7 @@
         const cyclic = {};
         cyclic.self = cyclic;
         const root = Composite({ value: 1 });
-        return [new Date(0), () => {}, cyclic].every(value =>
+        return [new Date(0), () => { }, cyclic].every(value =>
           throws(() => Composite.rawSet(root, ["value"], value))) && root.value === 1;
       },
     },
@@ -358,11 +358,11 @@
       },
       "set creates missing arrays": () =>
         Composite.set(Composite({})).items[0].value(2) === Composite({ items: [{ value: 2 }] }),
-      "set accepts undefined and the deletion sentinel": () => {
+      "set accepts undefined while delete removes the property": () => {
         const root = Composite({ value: 1 });
         const result = Composite.set(root).value(undefined);
         return Object.hasOwn(result, "value") && result.value === undefined &&
-          !Object.hasOwn(Composite.set(root).value(Composite.delete), "value");
+          !Object.hasOwn(Composite.delete(root).value(), "value");
       },
       "set clones values by default and consumes them when requested": () => {
         const value = { child: { marker: Symbol("set consume") } };
@@ -390,9 +390,11 @@
       },
       "transform can initialize missing paths": () =>
         Composite.transform(Composite({})).user.age(value => (value ?? 0) + 1) ===
-          Composite({ user: { age: 1 } }),
-      "transform can delete a property": () =>
-        !Object.hasOwn(Composite.transform(Composite({ value: 1 })).value(() => Composite.delete), "value"),
+        Composite({ user: { age: 1 } }),
+      "transform can store a symbol as an ordinary value": () => {
+        const value = Symbol("data");
+        return Composite.transform(Composite({ value: 1 })).value(() => value).value === value;
+      },
       "transform clones or consumes its returned value": () => {
         const root = Composite({ value: 1 });
         const value = { child: { marker: Symbol("transform clone") } };
@@ -966,6 +968,339 @@
       },
     };
   }
+
+  tests["rawDelete"] = {
+    "Missing ancestors do not create empty branches": () => {
+      const root = Composite({});
+      return Composite.rawDelete(root, ["a", "b"]) === root && Composite.rawDelete(root, ["a", "b", "c"]) === root &&
+        Composite.rawDelete(root, ["items", 0, "value"]) === root && !Object.hasOwn(root, "a");
+    },
+    "Missing targets preserve existing ancestors and sibling identities": () => {
+      const root = Composite({ a: { keep: { value: 1 } }, other: [1] });
+      return Composite.rawDelete(root, ["a", "missing", "value"]) === root &&
+        Composite.rawDelete(root, ["a", "missing"]) === root;
+    },
+    "Primitive roots and ancestors remain unchanged": () =>
+      [null, undefined, false, 0, NaN, "text", 1n, Symbol("primitive")].every(value => {
+        const root = Composite({ a: value });
+        return Object.is(Composite.rawDelete(value, ["a", "b"]), value) &&
+          Composite.rawDelete(root, ["a", "b"]) === root && Composite.rawDelete(root, ["a", "0"]) === root;
+      }),
+    "Deletes existing nested properties and shares untouched branches": () => {
+      const root = Composite({ a: { b: { value: 1, keep: 2 }, sibling: [3] }, other: [4] });
+      const result = Composite.rawDelete(root, ["a", "b", "value"]);
+      return result === Composite({ a: { b: { keep: 2 }, sibling: [3] }, other: [4] }) &&
+        result !== root && result.a !== root.a && result.a.b !== root.a.b &&
+        result.a.sibling === root.a.sibling && result.other === root.other && root.a.b.value === 1 &&
+        Object.isFrozen(result) && Object.isFrozen(result.a) && Object.isFrozen(result.a.b);
+    },
+    "Deleting the last property preserves its existing empty parent": () => {
+      const root = Composite({ a: { b: 1 } });
+      const result = Composite.rawDelete(root, ["a", "b"]);
+      return result === Composite({ a: {} }) && Object.hasOwn(result, "a") &&
+        Composite.rawDelete(result, ["a", "b"]) === result;
+    },
+    "Own undefined and null properties are deleted": () =>
+      [undefined, null].every(value => {
+        const root = Composite({ a: { b: value } });
+        const result = Composite.rawDelete(root, ["a", "b"]);
+        return !Object.hasOwn(result.a, "b") && Object.hasOwn(root.a, "b");
+      }),
+    "Symbol and empty-string keys can be deleted with a frozen path": () => {
+      const key = Symbol("delete key");
+      const root = Composite({ [key]: { "": 1, keep: 2 } });
+      const path = Object.freeze([key, ""]);
+      const result = Composite.rawDelete(root, path);
+      return !Object.hasOwn(result[key], "") && result[key].keep === 2 && root[key][""] === 1 &&
+        path.length === 2 && path[0] === key && path[1] === "";
+    },
+    "Deleting array elements preserves length and leaves holes": () => {
+      const root = Composite({ items: [1, 2, 3] });
+      const result = Composite.rawDelete(root, ["items", 1]);
+      return result.items === Composite([1, , 3]) && root.items === Composite([1, 2, 3]) &&
+        Composite.rawDelete(root, ["items", "1"]) === result;
+    },
+    "Missing array indices and holes are no-ops": () => {
+      const root = Composite({ items: [1, , 3] });
+      return Composite.rawDelete(root, ["items", 1]) === root && Composite.rawDelete(root, ["items", 10]) === root &&
+        Composite.rawDelete(root, ["items", 1, "value"]) === root && Composite.rawDelete(root, ["items", 10, "value"]) === root;
+    },
+    "Deleting inside an array preserves holes and custom properties": () => {
+      const key = Symbol("metadata");
+      const items = [{ value: 1, keep: 2 }, ,];
+      items[key] = { marker: Symbol("array sibling") };
+      const root = Composite(items);
+      const result = Composite.rawDelete(root, [0, "value"]);
+      return Array.isArray(result) && result.length === 2 && !(1 in result) &&
+        result[0] === Composite({ keep: 2 }) && result[key] === root[key] && root[0].value === 1;
+    },
+    "Inherited properties are not traversed or turned into own properties": () => {
+      const root = Composite({});
+      return Composite.rawDelete(root, ["constructor"]) === root && Composite.rawDelete(root, ["constructor", "prototype"]) === root &&
+        Composite.rawDelete(root, ["toString", "name"]) === root;
+    },
+    "Consumed non-enumerable properties can be traversed and deleted": () => {
+      const child = { remove: 1, keep: Symbol("hidden child") };
+      const input = Object.defineProperty({ visible: 2 }, "hidden", { value: child });
+      const root = Composite(input, true);
+      const result = Composite.rawDelete(root, ["hidden", "remove"]);
+      return result.visible === 2 && result.hidden.keep === child.keep &&
+        !Object.hasOwn(result.hidden, "remove") && root.hidden.remove === 1 &&
+        !Object.hasOwn(Composite.rawDelete(root, ["hidden"]), "hidden");
+    },
+    "delete on root works": () => {
+      const root = Composite({ visible: 2, hidden: { remove: 1, keep: Symbol("hidden child") } }, true);
+      const result = Composite.rawDelete(root, ["hidden"]);
+      return !Object.hasOwn(result, "hidden");
+    },
+    "Deleting array length throws without changing the root": () => {
+      const root = Composite({ items: [1, 2] });
+      return throws(() => Composite.rawDelete(root, ["items", "length"])) && root.items === Composite([1, 2]);
+    },
+    "Rejects __proto__ even after a missing ancestor": () => {
+      const root = Composite({});
+      return [["__proto__"], ["__proto__", "value"], ["missing", "__proto__", "value"]].every(path =>
+        throws(() => Composite.rawDelete(root, path)));
+    },
+    "Rejects non-composite roots": () =>
+      [{}, [], Object.freeze({}), new Date(0), () => { }].every(root =>
+        throws(() => Composite.rawDelete(root, ["value"]))),
+    "Rejects empty and non-array paths": () =>
+      [[], "value", null, undefined, { 0: "value", length: 1 }].every(path =>
+        throws(() => Composite.rawDelete(Composite({}), path))),
+  };
+
+  tests["delete lens"] = {
+    "Missing a.b leaves an empty root unchanged": () => {
+      const root = Composite({});
+      return Composite.delete(root).a.b() === root;
+    },
+    "Missing a.b.c leaves an empty root unchanged": () => {
+      const root = Composite({});
+      return Composite.delete(root).a.b.c() === root;
+    },
+    "A missing array ancestor is not created": () => {
+      const root = Composite({});
+      return Composite.delete(root).items[0].value() === root;
+    },
+    "A missing leaf leaves its existing parent unchanged": () => {
+      const root = Composite({ a: { keep: 1 } });
+      return Composite.delete(root).a.missing() === root;
+    },
+    "A missing intermediate object is not created": () => {
+      const root = Composite({ a: { keep: 1 } });
+      return Composite.delete(root).a.missing.value() === root;
+    },
+    "Deletes an existing nested property": () => {
+      const root = Composite({ a: { b: 1, keep: 2 } });
+      const result = Composite.delete(root).a.b();
+      return result === Composite({ a: { keep: 2 } });
+    },
+    "Leaves the original root unchanged": () => {
+      const root = Composite({ a: { b: 1 } });
+      Composite.delete(root).a.b();
+      return root.a.b === 1;
+    },
+    "Shares untouched siblings": () => {
+      const root = Composite({ a: { b: 1, sibling: [2] }, other: [3] });
+      const result = Composite.delete(root).a.b();
+      return result.a.sibling === root.a.sibling && result.other === root.other;
+    },
+    "Freezes the changed branches": () => {
+      const root = Composite({ a: { b: 1 } });
+      const result = Composite.delete(root).a.b();
+      return Object.isFrozen(result) && Object.isFrozen(result.a);
+    },
+    "Deleting the last property keeps its parent": () => {
+      const root = Composite({ a: { b: 1 } });
+      return Composite.delete(root).a.b() === Composite({ a: {} });
+    },
+    "Deleting from an existing empty parent is a no-op": () => {
+      const root = Composite({ a: {} });
+      return Composite.delete(root).a.b() === root;
+    },
+    "Deletes an own undefined property": () => {
+      const root = Composite({ a: { b: undefined } });
+      return !Object.hasOwn(Composite.delete(root).a.b().a, "b");
+    },
+    "Deletes an own null property": () => {
+      const root = Composite({ a: { b: null } });
+      return !Object.hasOwn(Composite.delete(root).a.b().a, "b");
+    },
+    "Deletes a symbol property": () => {
+      const key = Symbol("key");
+      const root = Composite({ [key]: 1, keep: 2 });
+      return Composite.delete(root)[key]() === Composite({ keep: 2 });
+    },
+    "Deletes an empty-string property": () => {
+      const root = Composite({ "": 1, keep: 2 });
+      return Composite.delete(root)[""]() === Composite({ keep: 2 });
+    },
+    "Deleting an array element leaves a hole and preserves length": () => {
+      const root = Composite({ items: [1, 2, 3] });
+      return Composite.delete(root).items[1]().items === Composite([1, , 3]);
+    },
+    "Deleting an array hole is a no-op": () => {
+      const root = Composite({ items: [1, , 3] });
+      return Composite.delete(root).items[1]() === root;
+    },
+    "Deleting an out-of-range index is a no-op": () => {
+      const root = Composite({ items: [1] });
+      return Composite.delete(root).items[10]() === root;
+    },
+    "Deleting below an array hole is a no-op": () => {
+      const root = Composite({ items: [1, , 3] });
+      return Composite.delete(root).items[1].value() === root;
+    },
+    "Deleting below an out-of-range index is a no-op": () => {
+      const root = Composite({ items: [1] });
+      return Composite.delete(root).items[10].value() === root;
+    },
+    "Deleting inside an array preserves trailing holes": () => {
+      const root = Composite([{ value: 1, keep: 2 }, ,]);
+      return Composite.delete(root)[0].value() === Composite([{ keep: 2 }, ,]);
+    },
+    "Deleting inside an array preserves custom properties": () => {
+      const items = [{ value: 1 }];
+      items.label = "items";
+      const root = Composite(items);
+      return Composite.delete(root)[0].value().label === "items";
+    },
+    "Deleting an inherited property is a no-op": () => {
+      const root = Composite({});
+      return Composite.delete(root).constructor() === root;
+    },
+    "Deleting below an inherited property is a no-op": () => {
+      const root = Composite({});
+      return Composite.delete(root).constructor.prototype() === root;
+    },
+    "Deletes a consumed non-enumerable property": () => {
+      const input = Object.defineProperty({}, "hidden", { value: Symbol("hidden") });
+      const root = Composite(input, true);
+      return !Object.hasOwn(Composite.delete(root).hidden(), "hidden");
+    },
+    "Deletes inside a consumed non-enumerable property": () => {
+      const child = { value: 1, keep: Symbol("hidden child") };
+      const input = Object.defineProperty({}, "hidden", { value: child });
+      const root = Composite(input, true);
+      return Composite.delete(root).hidden.value().hidden === Composite({ keep: child.keep });
+    },
+    "Rejects deleting array length": () => {
+      const root = Composite({ items: [1, 2] });
+      return throws(() => Composite.delete(root).items.length());
+    },
+    "Rejects __proto__ as the target": () =>
+      throws(() => Composite.delete(Composite({})).__proto__()),
+    "Rejects traversing __proto__": () =>
+      throws(() => Composite.delete(Composite({})).__proto__.value()),
+    "Rejects __proto__ after a missing ancestor": () =>
+      throws(() => Composite.delete(Composite({})).missing.__proto__.value()),
+    "Rejects a non-composite root": () =>
+      throws(() => Composite.delete({ a: 1 })),
+    "Rejects a call without a property path": () =>
+      throws(() => Composite.delete(Composite({}))()),
+    "Rejects arguments": () =>
+      throws(() => Composite.delete(Composite({ a: 1 })).a(undefined)),
+    "A successful deletion consumes the lens": () => {
+      const lens = Composite.delete(Composite({ a: 1 })).a;
+      lens();
+      return throws(() => lens(), Error);
+    },
+    "A successful deletion invalidates sibling branches": () => {
+      const lens = Composite.delete(Composite({ a: 1, b: 2 }));
+      const sibling = lens.b;
+      lens.a();
+      return throws(() => sibling(), Error);
+    },
+    "A successful deletion prevents further property access": () => {
+      const lens = Composite.delete(Composite({ a: 1 }));
+      lens.a();
+      return throws(() => lens.b, Error);
+    },
+    "A failed deletion consumes the lens": () => {
+      const lens = Composite.delete(Composite({ a: 1 })).a;
+      if (!throws(() => lens(undefined))) return false;
+      return throws(() => lens(), Error);
+    },
+    "A deletion without a path consumes the lens": () => {
+      const lens = Composite.delete(Composite({}));
+      if (!throws(() => lens())) return false;
+      return throws(() => lens.a, Error);
+    },
+    "A no-op deletion consumes the lens": () => {
+      const lens = Composite.delete(Composite({})).a.b;
+      lens();
+      return throws(() => lens(), Error);
+    },
+    "Deleting below a null root is a no-op": () => {
+      const root = null;
+      return Object.is(Composite.delete(root).a.b(), root);
+    },
+    "Deleting below a null property is a no-op": () => {
+      const root = Composite({ a: null });
+      return Composite.delete(root).a.b() === root;
+    },
+    "Deleting below an undefined root is a no-op": () => {
+      const root = undefined;
+      return Object.is(Composite.delete(root).a.b(), root);
+    },
+    "Deleting below an undefined property is a no-op": () => {
+      const root = Composite({ a: undefined });
+      return Composite.delete(root).a.b() === root;
+    },
+    "Deleting below a false root is a no-op": () => {
+      const root = false;
+      return Object.is(Composite.delete(root).a.b(), root);
+    },
+    "Deleting below a false property is a no-op": () => {
+      const root = Composite({ a: false });
+      return Composite.delete(root).a.b() === root;
+    },
+    "Deleting below a zero root is a no-op": () => {
+      const root = 0;
+      return Object.is(Composite.delete(root).a.b(), root);
+    },
+    "Deleting below a zero property is a no-op": () => {
+      const root = Composite({ a: 0 });
+      return Composite.delete(root).a.b() === root;
+    },
+    "Deleting below a NaN root is a no-op": () => {
+      const root = NaN;
+      return Object.is(Composite.delete(root).a.b(), root);
+    },
+    "Deleting below a NaN property is a no-op": () => {
+      const root = Composite({ a: NaN });
+      return Composite.delete(root).a.b() === root;
+    },
+    "Deleting below a string root is a no-op": () => {
+      const root = "text";
+      return Object.is(Composite.delete(root).a.b(), root);
+    },
+    "Deleting below a string property is a no-op": () => {
+      const root = Composite({ a: "text" });
+      return Composite.delete(root).a.b() === root;
+    },
+    "Deleting below a bigint root is a no-op": () => {
+      const root = 1n;
+      return Object.is(Composite.delete(root).a.b(), root);
+    },
+    "Deleting below a bigint property is a no-op": () => {
+      const root = Composite({ a: 1n });
+      return Composite.delete(root).a.b() === root;
+    },
+    "Deleting below a symbol root is a no-op": () => {
+      const root = Symbol("primitive");
+      return Object.is(Composite.delete(root).a.b(), root);
+    },
+    "Deleting below a symbol property is a no-op": () => {
+      const root = Composite({ a: Symbol("primitive") });
+      return Composite.delete(root).a.b() === root;
+    },
+    "Deleting a string index does not replace the string": () => {
+      const root = Composite({ a: "text" });
+      return Composite.delete(root).a[0]() === root;
+    },
+  };
 
   console.log("Accessors, proxies, modified built-in prototypes, and garbage-collection timing are not covered.");
   runTests(tests);
