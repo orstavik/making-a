@@ -4,7 +4,7 @@
 <h1>Composite tests</h1>
 <p id="summary">Open the browser console for grouped results.</p>
 <script type="module">
-  function runTests(tests) {
+  async function runTests(tests) {
     function printGroup(group, results) {
       results.every(result => result.passed) ?
         console.groupCollapsed(group) :
@@ -16,17 +16,17 @@
       console.groupEnd();
     }
 
-    const results = Object.entries(tests).map(([group, cases]) => {
-      const groupResults = Object.entries(cases).map(([test, run]) => {
+    const results = await Promise.all(Object.entries(tests).map(async ([group, cases]) => {
+      const groupResults = await Promise.all(Object.entries(cases).map(async ([test, run]) => {
         try {
-          return { test, passed: run() === true };
+          return { test, passed: await run() === true };
         } catch (caught) {
           return { test, error: String(caught) };
         }
-      });
+      }));
       printGroup(group, groupResults);
       return groupResults;
-    }).flat();
+    })).then(groups => groups.flat());
 
     const failed = results.filter(result => !result.passed).length;
     const summary = `Tests finished: ${results.length - failed} passed, ${failed} failed.`;
@@ -1300,6 +1300,130 @@
       const root = Composite({ a: "text" });
       return Composite.delete(root).a[0]() === root;
     },
+  };
+  tests["lense edge cases"] = {
+    "Object path keys cannot pollute Object.prototype": () => {
+      const root = Composite({});
+      const marker = Symbol("pollution-test");
+      const key = { toString: () => "__proto__" };
+
+      try {
+        let rejected = false;
+        try {
+          Composite.rawSet(root, [key, marker], 123);
+        } catch {
+          rejected = true;
+        }
+        return rejected && !Object.hasOwn(Object.prototype, marker);
+      } finally {
+        delete Object.prototype[marker];
+      }
+    },
+
+    "JSON serialization consumes a lens": () => {
+      const lens = Composite.set(Composite({ a: 1 }));
+      JSON.stringify(lens);
+      try {
+        lens.a(2);
+      } catch (e) {
+        return e.message === 'Proxy already consumed';
+      }
+    },
+
+    "Awaiting a lens consumes it": async () => {
+      const lens = Composite.set(Composite({ a: 1 }));
+      try {
+        await lens;
+      } catch (e) {
+        return true;
+      }
+    },
+
+    "An own map property does not break the map operation": () => {
+      const items = [1, 2];
+      items.map = 42;
+      const root = Composite({ items });
+
+      try {
+        const result = Composite.map(root).items(x => x * 2);
+        return result === Composite({ items: [2, 4] });
+      } catch {
+        return false;
+      }
+    },
+
+    "An own slice property does not break reverse": () => {
+      const items = [1, 2];
+      items.slice = 42;
+      const root = Composite({ items });
+
+      try {
+        const result = Composite.reverse(root).items();
+        return result.items[0] === 2 &&
+          result.items[1] === 1;
+      } catch {
+        return false;
+      }
+    },
+
+    "Reverse preserves named array properties": () => {
+      const items = [1, 2];
+      items.note = "keep";
+      const root = Composite({ items });
+      const result = Composite.reverse(root).items();
+
+      return result.items[0] === 2 &&
+        result.items[1] === 1 &&
+        Object.hasOwn(result.items, "note") &&
+        result.items.note === "keep";
+    },
+
+    "Reverse preserves symbol array properties": () => {
+      const tag = Symbol("tag");
+      const items = [1, 2];
+      items[tag] = "keep";
+      const root = Composite({ items });
+      const result = Composite.reverse(root).items();
+
+      return result.items[0] === 2 &&
+        result.items[1] === 1 &&
+        Object.hasOwn(result.items, tag) &&
+        result.items[tag] === "keep";
+    },
+
+    "An empty map path is rejected before callbacks execute": () => {
+      const root = Composite([1, 2]);
+      let calls = 0;
+      let rejected = false;
+
+      try {
+        Composite.map(root)(value => {
+          calls++;
+          return value;
+        });
+      } catch {
+        rejected = true;
+      }
+
+      return rejected && calls === 0;
+    },
+
+    "An empty transform path is rejected before its callback executes": () => {
+      const root = Composite({ a: 1 });
+      let calls = 0;
+      let rejected = false;
+
+      try {
+        Composite.transform(root)(value => {
+          calls++;
+          return value;
+        });
+      } catch {
+        rejected = true;
+      }
+
+      return rejected && calls === 0;
+    }
   };
 
   console.log("Accessors, proxies, modified built-in prototypes, and garbage-collection timing are not covered.");

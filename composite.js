@@ -215,14 +215,13 @@ function setImpl(obj, path, value, consume) {
 
 Composite.rawSet = function set(root, path, value, consumeValue = false) {
   if (!Composite.is(root)) throw new TypeError("Composite: Root must be a composite.");
-  if (!Array.isArray(path) || path.length < 1) throw new TypeError("Composite: Path must be a non-empty array.");
+  if (!Array.isArray(path) || path.length < 1 || path.some(k => String(k) === "__proto__")) throw new TypeError("Composite: Path must be a non-empty array.");
   return Composite(setImpl(root, path, Composite(value, consumeValue), true));
 };
 
 Composite.rawDelete = function rawDelete(root, path) {
   if (!Composite.is(root)) throw new TypeError("Composite: Root must be a composite.");
-  if (!Array.isArray(path) || path.length < 1) throw new TypeError("Composite: Path must be a non-empty array.");
-  if (path.includes("__proto__")) throw new TypeError("Composite: Access to __proto__ is not allowed.");
+  if (!Array.isArray(path) || path.length < 1 || path.some(k => String(k) === "__proto__")) throw new TypeError("Composite: Path must be a non-empty array.");
   const parent = path.length > 1 ? getImpl(root, path, path.length - 1) : root;
   const key = path[path.length - 1];
   if (parent == null || typeof parent !== "object" || !Object.hasOwn(parent, key))
