@@ -1,0 +1,71 @@
+<script type="module">
+  function placeTrace(skip = 0, SKIPS = []) {
+    const stack = new Error().stack.split("\n").map(line => line.split("(")[0].trim().split(" ").pop());
+    for (let i = skip + 1; i < stack.length - 1; i++) {
+      const name = stack[i];
+      if (!SKIPS.includes(name))
+        return name;
+    }
+    return stack.at(-1);
+  }
+
+  import { Composite as C } from "../composite.js";
+  const { rawSet: rawSetOg, rawDelete: rawDeleteOg } = C;
+
+  const history = [];
+  function log(old, now, path) {
+    const caller = placeTrace(2, ["rawSet", "rawDelete", "Object.apply", "Composite.rawSet", "Composite.rawDelete", "anonymous"]);
+    history.push({ old, now, path, caller, time: performance.now() });
+  }
+
+  function* reverseHistory(target) {
+    for (let i = history.length - 1; i >= 0; i--) {
+      const entry = history[i];
+      if (entry.now === target) {
+        target = entry.old;
+        yield entry;
+      }
+    }
+  }
+
+  function* forwardHistory(target) {
+    for (let i = 0; i < history.length; i++) {
+      const entry = history[i];
+      if (entry.old === target) {
+        target = entry.now;
+        yield entry;
+      }
+    }
+  }
+
+  C.rawSet = function rawSet(root, path, value, consume) {
+    const newRoot = rawSetOg(root, path, value, consume);
+    if (newRoot !== root) log(root, newRoot, path);
+    return newRoot;
+  };
+  C.rawDelete = function rawDelete(root, path) {
+    const newRoot = rawDeleteOg(root, path);
+    if (newRoot !== root && path.length === 1) log(root, newRoot, []);
+    return newRoot;
+  };
+
+  //making a small test to see if the history is working
+  const root = C({ a: 1, b: { c: 2, d: 3 } });
+  const root2 = C.set(root).a(42);
+  const root3 = C.rawSet(root2, ["b", "c"], 43);
+  const root4 = C.delete(root3).b.c();
+  const root5 = C.rawDelete(root4, ["a"]);
+  const root6 = C.rawDelete(root5, ["b", "d"]);
+  const root7 = C.delete(root6).b();
+  console.log(JSON.stringify(root7));
+
+  const printHistory = (title, history) => {
+    console.log(title);
+    console.table(history.map(h => Object.fromEntries(Object.entries(h).map(([k, v]) => [k, typeof v === "object" ? JSON.stringify(v) : v]))));
+  };
+
+  printHistory("Full History", history);
+  printHistory("Reverse History", [...reverseHistory(root7)]);
+  printHistory("Forward History", [...forwardHistory(root)]);
+
+</script>
