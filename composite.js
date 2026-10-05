@@ -22,11 +22,16 @@ function hashString(str, hash = 0x811c9dc5) {
 }
 
 let i = 0;
-const StaticSymbols = new Map(), DynamicSymbols = new WeakMap();
+const StaticSymbols = new Map(), DynamicSymbols = new WeakMap(), FunctionIds = new WeakMap();
 function hashSymbol(s, hash = 0x811c9dc5) {
   let v = StaticSymbols.get(s) ?? DynamicSymbols.get(s);
   if (!v)
     Symbol.keyFor(s) !== undefined ? StaticSymbols.set(s, v = ++i) : DynamicSymbols.set(s, v = ++i);
+  return Math.imul(hash ^ v, 0x01000193);
+}
+function hashFunction(f, hash = 0x811c9dc5) {
+  let v = FunctionIds.get(f);
+  if (!v) FunctionIds.set(f, v = ++i);
   return Math.imul(hash ^ v, 0x01000193);
 }
 
@@ -54,6 +59,7 @@ function hashPrimitive(v, hash = 0x811c9dc5) {
   if (t === 'bigint') return hashString(v.toString(), hash);
   if (t === 'number') return hashNumber(v, hash);
   if (t === 'symbol') return hashSymbol(v, hash);
+  if (t === 'function') return hashFunction(v, hash);
 }
 function hashPropertyKey(key, hash = 0x811c9dc5) {
   hash = Math.imul(hash ^ HASHTAGS.property, 0x01000193);
@@ -172,7 +178,7 @@ function CompositeImpl(obj, consume = false, seen = new Set()) {
 Composite.is = function is(v) {
   return v == null || typeof v === 'string' ||
     typeof v === 'number' || typeof v === 'boolean' ||
-    typeof v === 'symbol' ||
+    typeof v === 'symbol' || typeof v === 'function' ||
     typeof v === 'bigint' || HASHCACHE.getHash(v) !== undefined;
 }
 
@@ -284,3 +290,47 @@ for (const name of DirtyArrayFns) {
     return copy;
   });
 }
+
+//This can also be thrown. And we could also use an ast here to test for closure variables in the function. 
+//But that would be very costly. And we could accept closure functions on the outside.
+function normalizeEs6Methods(code) {
+  return /^\s*(?:async\s+)?(?!\bfunction\b)[$\w]+\s*\(/.test(code) ?
+    code.replace(/^\s*(async\s+|)/, '$1function ') :
+    code;
+}
+
+function replacer(key, value) {
+  if (typeof value === 'function')
+    return `\u0000F${normalizeEs6Methods(value.toString())}`;
+  if (typeof value === 'symbol') {
+    const globalSymbol = Symbol.keyFor(value);
+    return globalSymbol !== undefined ?
+      `\u0000G${globalSymbol}` :
+      `\u0000S${value.description ?? ""}`;
+  }
+  if (typeof value === 'string' && value[0] === '\u0000')
+    throw new TypeError(`String value for key "${key}" cannot start with null byte (\\u0000).`);
+  return value;
+}
+
+function reviver(value, symbolsArray, functionsArray) {
+  if (typeof value !== 'string' || value[0] !== '\u0000')
+    return value;
+  const type = value[1];
+  const data = value.slice(2);
+  if (type === 'G')
+    return Symbol.for(data);
+  if (type === 'S')
+    return symbolsArray.find(sym => (sym.description ?? "") === data) ?? (symbolsArray.push(Symbol(data)), symbolsArray.at(-1));
+  if (type === 'F')
+    return functionsArray.find(fn => fn.toString() === data) ?? (functionsArray.push(new Function(`return (${data})`)()), functionsArray.at(-1));
+  throw new TypeError(`\u0000-prefixed string value is not recognized: ${value}`);
+}
+
+Composite.parse = function parse(str, symbolsArray = [], functionsArray = []) {
+  return Composite(JSON.parse(str, (key, value) => reviver(value, symbolsArray, functionsArray)), true);
+};
+
+Composite.stringify = function stringify(obj) {
+  return JSON.stringify(obj, replacer);
+};

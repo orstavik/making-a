@@ -326,7 +326,7 @@
         return Object.hasOwn(result, "hidden") && result.hidden === root.hidden && result.value === 2;
       },
       "Rejects non-composite roots": () =>
-        [{}, [], Object.freeze({}), new Date(0), () => { }].every(root =>
+        [{}, [], Object.freeze({}), new Date(0)].every(root =>
           throws(() => Composite.rawSet(root, ["value"], 1))),
       "Rejects empty and non-array paths": () =>
         [[], "value", null, undefined, { 0: "value", length: 1 }].every(path =>
@@ -338,7 +338,7 @@
         const cyclic = {};
         cyclic.self = cyclic;
         const root = Composite({ value: 1 });
-        return [new Date(0), () => { }, cyclic].every(value =>
+        return [new Date(0), cyclic].every(value =>
           throws(() => Composite.rawSet(root, ["value"], value))) && root.value === 1;
       },
     },
@@ -429,8 +429,6 @@
         class Example { }
         if (!throws(() => Composite(new Date(0)))) return false;
         if (!throws(() => Composite({ value: new Date(0) }))) return false;
-        if (!throws(() => Composite(function example() { }))) return false;
-        if (!throws(() => Composite({ value: function example() { } }))) return false;
         if (!throws(() => Composite(new Map()))) return false;
         if (!throws(() => Composite({ value: new Map() }))) return false;
         if (!throws(() => Composite(new Set()))) return false;
@@ -691,6 +689,35 @@
       "0 and -0 under the same Symbol(\"zero\") key remain distinct": () => {
         const key = Symbol("zero");
         return Composite({ [key]: 0 }) !== Composite({ [key]: -0 });
+      },
+    },
+
+    "Functions": {
+      "The same function reference placed in two separate composites produces equal hashes": () => {
+        const fn = () => 1;
+        const a = Composite({ fn });
+        const b = Composite({ fn });
+        return a === b && a.fn === fn;
+      },
+      "Two functions with identical source text but different identities produce different hashes": () => {
+        const fn1 = () => 1;
+        const fn2 = () => 1;
+        return Composite({ fn: fn1 }) !== Composite({ fn: fn2 });
+      },
+      "The same function appearing twice inside one composite hashes consistently": () => {
+        const fn = () => 1;
+        const a = Composite({ x: fn, y: fn });
+        const b = Composite({ x: fn, y: fn });
+        return a === b && a.x === fn && a.y === fn;
+      },
+      "Composite.is returns true for a function": () => {
+        return Composite.is(() => { }) && Composite.is(function () { });
+      },
+      "A function nested inside an object/array inside a composite still hashes and retrieves correctly": () => {
+        const fn = () => 1;
+        const a = Composite({ nested: { fn }, list: [fn] });
+        const b = Composite({ nested: { fn }, list: [fn] });
+        return a === b && a.nested.fn === fn && a.list[0] === fn;
       },
     },
 
@@ -1063,7 +1090,7 @@
         throws(() => Composite.rawDelete(root, path)));
     },
     "Rejects non-composite roots": () =>
-      [{}, [], Object.freeze({}), new Date(0), () => { }].every(root =>
+      [{}, [], Object.freeze({}), new Date(0)].every(root =>
         throws(() => Composite.rawDelete(root, ["value"]))),
     "Rejects empty and non-array paths": () =>
       [[], "value", null, undefined, { 0: "value", length: 1 }].every(path =>
